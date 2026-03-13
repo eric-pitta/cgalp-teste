@@ -94,27 +94,28 @@ def exportar_html(df_filtrado, estilo_mapa):
         with open("relatorio.html", "r", encoding="utf-8") as f:
             template = f.read()
         
-        mapa_b64 = ""
-        try:
-            # Tenta gerar o mapa, mas não trava se o Kaleido falhar no servidor
-            counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
-            counts.columns = ['Bairro', 'Quantidade']
-            counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
-            counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
-            map_final = counts.dropna(subset=['lat', 'lon'])
-            
-            fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
-                                        color="Quantidade", color_continuous_scale='Plasma', size_max=20,
-                                        mapbox_style=estilo_mapa)
-            fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
-            mapa_bytes = fig_print.to_image(format="jpg", width=1000, height=500)
-            mapa_b64 = base64.b64encode(mapa_bytes).decode()
-        except:
-            pass # Se falhar, o relatório sai sem o mapa
+        # Mapa incorporado como HTML do Plotly (Não precisa de Kaleido!)
+        counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
+        counts.columns = ['Bairro', 'Quantidade']
+        counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
+        counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
+        map_final = counts.dropna(subset=['lat', 'lon'])
+        
+        fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
+                                    color="Quantidade", color_continuous_scale='Plasma', size_max=20,
+                                    mapbox_style=estilo_mapa)
+        fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), 
+                                coloraxis_colorbar=dict(orientation='h', y=-0.1), 
+                                margin=dict(l=0, r=0, t=0, b=0))
+        
+        # Transforma o mapa em um componente HTML interativo
+        mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
         
         # Substituições
         html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png"))
-        html = html.replace("{{MAPA_BASE64}}", mapa_b64)
+        # Substituímos a tag de imagem pela div do mapa interativo
+        html = html.replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
+        
         html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado)))
         html = html.replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum())))
         html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
@@ -135,7 +136,7 @@ def exportar_html(df_filtrado, estilo_mapa):
         
         return html
     except Exception as e:
-        return f"Erro ao gerar: {e}"
+        return f"Erro: {e}"
 
 # ----------------- UI -----------------
 col_logo, col_title = st.columns([1, 3])
@@ -173,7 +174,7 @@ estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-
 st.sidebar.divider()
 st.sidebar.subheader("📄 Relatórios")
 if st.sidebar.button("Gerar Relatório"):
-    with st.spinner("Preparando relatório para download..."):
+    with st.spinner("Preparando relatório de alta tecnologia..."):
         rel_html = exportar_html(df_f, estilo_mapa)
         st.sidebar.success("✅ Relatório pronto!")
         st.sidebar.download_button(
