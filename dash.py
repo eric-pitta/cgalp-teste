@@ -141,7 +141,7 @@ def exportar_html(df_filtrado, estilo_mapa):
 # ----------------- UI -----------------
 col_logo, col_title = st.columns([1, 3])
 with col_logo:
-    if os.path.exists("logo.png"): st.image("logo.png", width=250)
+    if os.path.exists("logo.png"): st.image("logo.png", width=1000)
 with col_title:
     st.write(""); st.write(""); st.write(""); st.write("")
     st.markdown("<h1 style='text-align: center;'>📊 Solicitações Câmara dos Deputados</h1>", unsafe_allow_html=True)
