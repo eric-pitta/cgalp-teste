@@ -3,4 +3,4 @@ pandas
 plotly
 openpyxl
 xhtml2pdf
-kaleido
+kaleido==0.1.0post1
