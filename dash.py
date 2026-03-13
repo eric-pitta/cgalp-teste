@@ -94,26 +94,23 @@ def exportar_html(df_filtrado, estilo_mapa):
         with open("relatorio.html", "r", encoding="utf-8") as f:
             template = f.read()
         
-        # Consolidação segura de dados para o mapa do relatório
-        counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
-        counts.columns = ['Bairro', 'Quantidade']
-        counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
-        counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
-        map_final = counts.dropna(subset=['lat', 'lon'])
-        
-        # MAPA EM JPEG (Mais leve para evitar bloqueio do navegador)
-        fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
-                                    color="Quantidade", color_continuous_scale='Plasma', size_max=20,
-                                    mapbox_style=estilo_mapa)
-        
-        fig_print.update_layout(
-            mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2),
-            coloraxis_colorbar=dict(orientation='h', y=-0.1, title="Solicitações"),
-            margin=dict(l=0, r=0, t=0, b=0)
-        )
-        # Usando JPEG e escala 1.0 para manter o tamanho do Base64 dentro do limite
-        mapa_bytes = fig_print.to_image(format="jpg", width=1000, height=500, scale=1.0)
-        mapa_b64 = base64.b64encode(mapa_bytes).decode()
+        mapa_b64 = ""
+        try:
+            # Tenta gerar o mapa, mas não trava se o Kaleido falhar no servidor
+            counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
+            counts.columns = ['Bairro', 'Quantidade']
+            counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
+            counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
+            map_final = counts.dropna(subset=['lat', 'lon'])
+            
+            fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
+                                        color="Quantidade", color_continuous_scale='Plasma', size_max=20,
+                                        mapbox_style=estilo_mapa)
+            fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
+            mapa_bytes = fig_print.to_image(format="jpg", width=1000, height=500)
+            mapa_b64 = base64.b64encode(mapa_bytes).decode()
+        except:
+            pass # Se falhar, o relatório sai sem o mapa
         
         # Substituições
         html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png"))
@@ -122,7 +119,7 @@ def exportar_html(df_filtrado, estilo_mapa):
         html = html.replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum())))
         html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
         html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"))
-        html = html.replace("{{PERIODO}}", "Filtro Aplicado" if st.session_state.click_req else "Geral")
+        html = html.replace("{{PERIODO}}", "Relatório Filtrado" if st.session_state.click_req else "Geral")
         
         html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue'))
         html = html.replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green'))
@@ -135,14 +132,15 @@ def exportar_html(df_filtrado, estilo_mapa):
             p = (row['Qtd'] / max_s * 100)
             status_html += f'<div class="chart-row"><div class="chart-label"><span>{row["Status"]}</span><span>{row["Qtd"]}</span></div><div class="bar-outer"><div class="bar-inner-respondido bar-orange-dark" style="width: {p}%;"></div></div></div>'
         html = html.replace("{{CHART_STATUS}}", status_html)
+        
         return html
     except Exception as e:
-        return f"Erro: {e}"
+        return f"Erro ao gerar: {e}"
 
 # ----------------- UI -----------------
 col_logo, col_title = st.columns([1, 3])
 with col_logo:
-    if os.path.exists("logo.png"): st.image("logo.png", width=1000)
+    if os.path.exists("logo.png"): st.image("logo.png", width=250)
 with col_title:
     st.write(""); st.write(""); st.write(""); st.write("")
     st.markdown("<h1 style='text-align: center;'>📊 Solicitações Câmara dos Deputados</h1>", unsafe_allow_html=True)
@@ -174,13 +172,16 @@ estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-
 # Sidebar - Relatórios
 st.sidebar.divider()
 st.sidebar.subheader("📄 Relatórios")
-if st.sidebar.button("Preparar Relatório"):
-    with st.spinner("Gerando visualização otimizada..."):
+if st.sidebar.button("Gerar Relatório"):
+    with st.spinner("Preparando relatório para download..."):
         rel_html = exportar_html(df_f, estilo_mapa)
-        # Otimizamos o HTML para ser aceito como data URI
-        b64_html = base64.b64encode(rel_html.encode('utf-8')).decode()
-        link_html = f'<a href="data:text/html;base64,{b64_html}" target="_blank" style="text-decoration: none;"><div style="background-color: #5CA0D3; color: white; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🚀 ABRIR EM NOVA ABA</div></a>'
-        st.sidebar.markdown(link_html, unsafe_allow_html=True)
+        st.sidebar.success("✅ Relatório pronto!")
+        st.sidebar.download_button(
+            label="📥 Baixar Relatório HTML",
+            data=rel_html,
+            file_name=f"relatorio_legislativo_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
+            mime="text/html"
+        )
 
 if st.sidebar.button("Limpar Todos os Filtros"):
     st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = st.session_state.click_status = None
