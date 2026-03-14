@@ -7,7 +7,72 @@ import base64
 import io
 
 # Configuração da Página
-st.set_page_config(page_title="Dashboard Câmara RJ", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Monitoramento CGALP", layout="wide", page_icon="📊")
+
+# --- INJEÇÃO DE CSS PARA VISUAL TECH/MODERNO ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    
+    html, body, [data-testid="stSidebar"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Estilo dos Títulos de Seção */
+    .section-header {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #113359;
+        border-left: 6px solid #5CA0D3;
+        padding-left: 15px;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        letter-spacing: -0.5px;
+    }
+
+    /* Container das Tabelas (Dataframes) */
+    .stDataFrame {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Cartões de Métricas Customizados */
+    .metric-card {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        border-color: #5CA0D3;
+    }
+    .metric-label {
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        color: #1e293b;
+        font-weight: 800;
+    }
+
+    /* Divider estilizado */
+    hr {
+        margin: 2em 0;
+        border: 0;
+        border-top: 1px solid #f1f5f9;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Funções Auxiliares
 def get_base64_logo(file_path):
@@ -94,7 +159,6 @@ def exportar_html(df_filtrado, estilo_mapa):
         with open("relatorio.html", "r", encoding="utf-8") as f:
             template = f.read()
         
-        # Mapa incorporado como HTML do Plotly (Não precisa de Kaleido!)
         counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
         counts.columns = ['Bairro', 'Quantidade']
         counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
@@ -104,23 +168,17 @@ def exportar_html(df_filtrado, estilo_mapa):
         fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
                                     color="Quantidade", color_continuous_scale='Plasma', size_max=20,
                                     mapbox_style=estilo_mapa)
-        fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), 
-                                coloraxis_colorbar=dict(orientation='h', y=-0.1), 
-                                margin=dict(l=0, r=0, t=0, b=0))
+        fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         
-        # Transforma o mapa em um componente HTML interativo
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
         
-        # Substituições
         html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png"))
-        # Substituímos a tag de imagem pela div do mapa interativo
         html = html.replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
-        
         html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado)))
         html = html.replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum())))
         html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
         html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"))
-        html = html.replace("{{PERIODO}}", "Relatório Filtrado" if st.session_state.click_req else "Geral")
+        html = html.replace("{{PERIODO}}", "Relatório Filtrado" if any([st.session_state.click_req, st.session_state.click_org]) else "Geral")
         
         html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue'))
         html = html.replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green'))
@@ -136,17 +194,15 @@ def exportar_html(df_filtrado, estilo_mapa):
         
         return html
     except Exception as e:
-        return f"Erro: {e}"
+        return f"Erro ao gerar: {e}"
 
 # ----------------- UI -----------------
 col_logo, col_title = st.columns([1, 3])
 with col_logo:
     if os.path.exists("logo.png"): st.image("logo.png", width=1000)
 with col_title:
-    st.write(""); st.write(""); st.write(""); st.write("")
-    st.markdown("<h1 style='text-align: center;'>📊 Solicitações Câmara dos Deputados</h1>", unsafe_allow_html=True)
-
-st.write(""); st.divider()
+    st.write(""); st.write(""); st.write("")
+    st.markdown("<h1 style='text-align: center; color: #113359; font-family: Inter, sans-serif; font-weight: 800;'>Monitoramento Legislativo</h1>", unsafe_allow_html=True)
 
 df = load_data()
 if df.empty: st.error("Arquivo Excel não encontrado."); st.stop()
@@ -155,8 +211,8 @@ if df.empty: st.error("Arquivo Excel não encontrado."); st.stop()
 for key in ['click_req', 'click_org', 'click_bairro', 'click_status']:
     if key not in st.session_state: st.session_state[key] = None
 
-# Sidebar - Filtros
-st.sidebar.header("🔍 Filtros")
+# Sidebar
+st.sidebar.header("🔍 Painel de Controle")
 anos = sorted(df['Ano'].dropna().unique().tolist())
 ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos, default=anos)
 
@@ -170,26 +226,20 @@ if st.session_state.click_status: df_f = df_f[df_f['Status'] == st.session_state
 
 estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-positron", "carto-darkmatter"], index=0)
 
-# Sidebar - Relatórios
 st.sidebar.divider()
-st.sidebar.subheader("📄 Relatórios")
-if st.sidebar.button("Gerar Relatório"):
-    with st.spinner("Preparando relatório de alta tecnologia..."):
+st.sidebar.subheader("📄 Exportação")
+if st.sidebar.button("Preparar Relatório Executivo"):
+    with st.spinner("Compilando dados..."):
         rel_html = exportar_html(df_f, estilo_mapa)
-        st.sidebar.success("✅ Relatório pronto!")
-        st.sidebar.download_button(
-            label="📥 Baixar Relatório HTML",
-            data=rel_html,
-            file_name=f"relatorio_legislativo_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
-            mime="text/html"
-        )
+        st.sidebar.success("✅ Pronto!")
+        st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
 
 if st.sidebar.button("Limpar Todos os Filtros"):
     st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = st.session_state.click_status = None
     st.rerun()
 
-# ----- MAPA DASHBOARD -----
-st.subheader(f"🗺️ Mapa de Incidências {f' - {st.session_state.click_bairro}' if st.session_state.click_bairro else ''}")
+# --- MAPA ---
+st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
 map_df_base = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
 map_df_base.columns = ['Bairro', 'Quantidade']
 map_df_base['lat_lon'] = map_df_base['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None]))
@@ -197,34 +247,29 @@ map_df_base['lat'] = [c[0] for c in map_df_base['lat_lon']]
 map_df_base['lon'] = [c[1] for c in map_df_base['lat_lon']]
 map_ready = map_df_base.dropna(subset=['lat', 'lon']).copy()
 
-fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", 
-                            hover_name="Bairro", color="Quantidade",
-                            color_continuous_scale='Plasma', size_max=40, zoom=10,
-                            mapbox_style=estilo_mapa)
+fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
 fig_map.update_layout(height=500, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
-
 sel_map = st.plotly_chart(fig_map, use_container_width=True, on_select="rerun")
 if sel_map and sel_map["selection"]["points"]:
     st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]
     st.rerun()
 
-st.divider()
+# --- MÉTRICAS CUSTOMIZADAS ---
+st.write("")
+m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
+with m_col1: st.markdown(f"<div class='metric-card'><div class='metric-label'>Solicitações</div><div class='metric-value'>{len(df_f)}</div></div>", unsafe_allow_html=True)
+with m_col2: st.markdown(f"<div class='metric-card'><div class='metric-label'>Respondidos</div><div class='metric-value'>{int(df_f['Respondido'].sum())}</div></div>", unsafe_allow_html=True)
+with m_col3: st.markdown(f"<div class='metric-card'><div class='metric-label'>Requerentes</div><div class='metric-value'>{df_f['Requerente'].nunique()}</div></div>", unsafe_allow_html=True)
+with m_col4: st.markdown(f"<div class='metric-card'><div class='metric-label'>Órgãos</div><div class='metric-value'>{df_f['Orgao'].nunique()}</div></div>", unsafe_allow_html=True)
+with m_col5: st.markdown(f"<div class='metric-card'><div class='metric-label'>Bairros</div><div class='metric-value'>{df_f['Bairro'].nunique()}</div></div>", unsafe_allow_html=True)
 
-col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-col_m1.metric("Solicitações", len(df_f))
-col_m2.metric("Respondidos", int(df_f['Respondido'].sum()))
-col_m3.metric("Requerentes", df_f['Requerente'].nunique())
-col_m4.metric("Órgãos", df_f['Orgao'].nunique())
-col_m5.metric("Bairros", df_f['Bairro'].nunique())
-
-st.divider()
-
+# --- INFOGRÁFICOS ---
 def criar_infografico(df_input, coluna_grupo, titulo, key_session, cor_barra):
-    if df_input.empty: st.subheader(titulo); st.info("Sem dados."); return
+    if df_input.empty: return
     stats = df_input.groupby(coluna_grupo).agg(Quantidade=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index()
     stats['% Respondido'] = (stats['Respondidos'] / stats['Quantidade'] * 100).fillna(0)
     stats = stats.sort_values('Quantidade', ascending=False)
-    st.subheader(titulo)
+    st.markdown(f"<div class='section-header'>{titulo}</div>", unsafe_allow_html=True)
     sel = st.dataframe(stats[[coluna_grupo, 'Quantidade', '% Respondido']], column_config={coluna_grupo: st.column_config.TextColumn(coluna_grupo.capitalize(), width="medium"), "Quantidade": st.column_config.ProgressColumn("Quantidade", format="%d", min_value=0, max_value=int(stats['Quantidade'].max()) if int(stats['Quantidade'].max()) > 0 else 100, color=cor_barra), "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor_barra)}, hide_index=True, use_container_width=True, on_select="rerun")
     if sel and sel["selection"]["rows"]:
         st.session_state[key_session] = stats.iloc[sel["selection"]["rows"][0]][coluna_grupo]
@@ -234,21 +279,19 @@ criar_infografico(df_f, 'Requerente', "👤 Desempenho por Requerente", 'click_r
 criar_infografico(df_f, 'Orgao', "🏢 Desempenho por Órgão", 'click_org', "green")
 criar_infografico(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "📍 Solicitações por Bairro", 'click_bairro', "violet")
 
-st.divider()
-
-st.subheader("📌 Status dos Atendimentos (Clique para filtrar)")
+st.markdown("<div class='section-header'>📌 Situação dos Atendimentos</div>", unsafe_allow_html=True)
 if not df_f.empty:
     status_counts = df_f['Status'].value_counts().reset_index()
     status_counts.columns = ['Status_Label', 'Quantidade']
     color_map = {'CONCLUÍDO': '#00CC96', 'ATENDIDO': '#00CC96', 'FINALIZADO': '#00CC96', 'PENDENTE': '#EF553B', 'EM ANDAMENTO': '#636EFA', 'AGUARDANDO': '#FFA15A', 'NÃO INFORMADO': '#94a3b8'}
     fig_status = px.bar(status_counts, x='Quantidade', y='Status_Label', orientation='h', color='Status_Label', color_discrete_map=color_map, text='Quantidade')
     fig_status.update_traces(textposition='outside', marker_line_width=0, opacity=0.9)
-    fig_status.update_layout(height=400, showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis_showgrid=False, yaxis_showgrid=False, xaxis_visible=False, yaxis_title="", margin=dict(l=0, r=50, t=30, b=0), clickmode='event+select')
+    fig_status.update_layout(height=400, showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis_showgrid=False, yaxis_showgrid=False, xaxis_visible=False, yaxis_title="", margin=dict(l=0, r=50, t=10, b=0), clickmode='event+select')
     sel_s = st.plotly_chart(fig_status, use_container_width=True, on_select="rerun")
     if sel_s and sel_s["selection"]["points"]:
         st.session_state.click_status = sel_s["selection"]["points"][0]["y"]
         st.rerun()
 
-st.divider()
-with st.expander("📄 Dados Detalhados"):
+st.write("")
+with st.expander("📄 Base de Dados Completa"):
     st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], use_container_width=True)
