@@ -174,31 +174,35 @@ def load_data():
         json_file = 'bot-consultor-10-10e87b7a88cd.json'
         
         creds = None
-        # 1. Tenta carregar o arquivo JSON local primeiro (Ambiente Local)
+        # 1. Tenta carregar o arquivo JSON local primeiro
         if os.path.exists(json_file):
             creds = Credentials.from_service_account_file(json_file, scopes=scope)
-        
-        # 2. Se não houver arquivo local, tenta carregar dos Secrets (Ambiente de Nuvem)
-        elif "gcp_service_account" in st.secrets:
-            # Converte AttrDict do Streamlit para um dicionário real de forma segura
-            gcp_secrets = st.secrets["gcp_service_account"]
-            creds_dict = {k: v for k, v in gcp_secrets.items()}
-            
-            # Tratamento para garantir que as quebras de linha da chave privada sejam lidas corretamente
-            if "private_key" in creds_dict:
-                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-            
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        
+        # 2. Se não houver arquivo, tenta os Secrets (Formato robusto)
         else:
-            st.error("Credenciais Google não encontradas (Local ou Nuvem).")
-            return pd.DataFrame()
+            try:
+                # Tentativa de captura total do dicionário de segredos
+                creds_info = st.secrets["gcp_service_account"]
+                # Converte para dicionário real para o Credentials.from_service_account_info
+                creds_dict = {
+                    "type": creds_info["type"],
+                    "project_id": creds_info["project_id"],
+                    "private_key_id": creds_info["private_key_id"],
+                    "private_key": creds_info["private_key"].replace("\\n", "\n"),
+                    "client_email": creds_info["client_email"],
+                    "client_id": creds_info["client_id"],
+                    "auth_uri": creds_info["auth_uri"],
+                    "token_uri": creds_info["token_uri"],
+                    "auth_provider_x509_cert_url": creds_info["auth_provider_x509_cert_url"],
+                    "client_x509_cert_url": creds_info["client_x509_cert_url"]
+                }
+                creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+            except Exception as secret_err:
+                st.error(f"Erro ao ler Secrets do Streamlit: {secret_err}")
+                return pd.DataFrame()
             
         client = gspread.authorize(creds)
-        sheet_id = "1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk"
-        spreadsheet = client.open_by_key(sheet_id)
+        spreadsheet = client.open_by_key("1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk")
         
-        # GIDs das abas
         gids = [151993621, 2138173973, 1659318255, 94298383, 168990156]
         df_list = []
         all_worksheets = spreadsheet.worksheets()
@@ -234,7 +238,7 @@ def load_data():
                 df[col] = df[col].replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
         return df
     except Exception as e:
-        st.error(f"Erro ao conectar com Google Sheets: {e}")
+        st.error(f"Erro crítico na conexão Google: {e}")
         return pd.DataFrame()
 
 # --- LÓGICA DE RELATÓRIO HTML ---
@@ -272,8 +276,8 @@ def exportar_html(df_filtrado, estilo_mapa):
 
 # ----------------- UI -----------------
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png", width="stretch"); st.write("")
-    st.header("🔍 Painel de Controle")
+    if os.path.exists("logo.png"): st.image("logo.png", width=120); st.write("")
+    st.header("Painel de Controle")
 
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
@@ -281,7 +285,7 @@ st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; tex
 with st.spinner("Carregando dados da nuvem..."):
     df = load_data()
 
-if df.empty: st.error("Erro ao carregar dados. Verifique a planilha e credenciais."); st.stop()
+if df.empty: st.stop()
 
 for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
@@ -352,8 +356,8 @@ if not df_f.empty:
         status_upper = str(row['Status']).upper()
         if status_upper in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
         elif status_upper in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
-        elif status_upper in ['EM ANDAMENTO', 'PARCIAL']: cor = "#8B5CF6"
-        elif status_upper in ['PENDENTE', 'AGUARDANDO']: cor = "#FACC15"
+        elif status_upper in ['EM ANDAMENTO','PENDENTE' ]: cor = "#AC5CF6"
+        elif status_upper in ['PARCIAL', 'AGUARDANDO']: cor = "#FACC15"
         elif status_upper == 'NÃO INFORMADO': cor = "#94a3b8"
         st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
