@@ -276,7 +276,7 @@ def exportar_html(df_filtrado, estilo_mapa):
 
 # ----------------- UI -----------------
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png", width=120); st.write("")
+    if os.path.exists("logo.png"): st.image("logo.png", width=110); st.write("")
     st.header("Painel de Controle")
 
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
@@ -356,8 +356,8 @@ if not df_f.empty:
         status_upper = str(row['Status']).upper()
         if status_upper in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
         elif status_upper in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
-        elif status_upper in ['EM ANDAMENTO','PENDENTE' ]: cor = "#AC5CF6"
-        elif status_upper in ['PARCIAL', 'AGUARDANDO']: cor = "#FACC15"
+        elif status_upper in ['EM ANDAMENTO','PENDENTE' ]: cor = "#EEF65C"
+        elif status_upper in ['PARCIAL', 'AGUARDANDO']: cor = "#15E7FA"
         elif status_upper == 'NÃO INFORMADO': cor = "#94a3b8"
         st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
