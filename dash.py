@@ -4,6 +4,8 @@ import plotly.express as px
 import os
 import unicodedata
 import base64
+import gspread
+from google.oauth2.service_account import Credentials
 import io
 
 # Configuração da Página
@@ -164,29 +166,56 @@ BAIRROS_RJ_COORDS = {
     'OLARIA': [-22.8422, -43.2567], 'RAMOS': [-22.8458, -43.2458]
 }
 
-@st.cache_data
+# --- CARREGAMENTO GOOGLE SHEETS HÍBRIDO ---
+@st.cache_data(ttl=600)
 def load_data():
-    excel_file = 'Solicitações - Câmara dos Deputados.xlsx'
-    if not os.path.exists(excel_file): return pd.DataFrame()
     try:
-        df_dict = pd.read_excel(excel_file, sheet_name=None)
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
+        # Tenta carregar dos Secrets (Nuvem) ou JSON local
+        if "gcp_service_account" in st.secrets:
+            creds_info = dict(st.secrets["gcp_service_account"])
+            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        else:
+            json_file = 'bot-consultor-10-10e87b7a88cd.json'
+            if not os.path.exists(json_file):
+                st.error("Arquivo de credenciais não encontrado.")
+                return pd.DataFrame()
+            creds = Credentials.from_service_account_file(json_file, scopes=scope)
+            
+        client = gspread.authorize(creds)
+        sheet_id = "1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk"
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        # GIDs das abas
+        gids = [151993621, 2138173973, 1659318255, 94298383, 168990156]
         df_list = []
-        for sheet_name, temp_df in df_dict.items():
-            if "Produtividade" in sheet_name: continue
-            col_mapping = {
-                'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data',
-                'Ementa': 'Assunto', 'Assunto': 'Assunto',
-                'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente',
-                'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao',
-                'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro',
-                'Atendimento': 'Status', 'Data da Saída': 'DataSaida'
-            }
-            temp_df.rename(columns=col_mapping, inplace=True)
-            df_list.append(temp_df)
+        all_worksheets = spreadsheet.worksheets()
+        
+        for gid in gids:
+            worksheet = next((ws for ws in all_worksheets if ws.id == gid), None)
+            if worksheet:
+                data = worksheet.get_all_records()
+                if data:
+                    temp_df = pd.DataFrame(data)
+                    col_mapping = {
+                        'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data',
+                        'Ementa': 'Assunto', 'Assunto': 'Assunto',
+                        'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente',
+                        'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao',
+                        'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro',
+                        'Atendimento': 'Status', 'Data da Saída': 'DataSaida'
+                    }
+                    temp_df.rename(columns=col_mapping, inplace=True)
+                    df_list.append(temp_df)
+        
+        if not df_list: return pd.DataFrame()
         df = pd.concat(df_list, ignore_index=True)
+        
+        # Processamento
         if 'Data' in df.columns:
             df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
-            df['Ano'] = df['Data'].dt.year.fillna(0).astype(int) # REMOVE O .0
+            df['Ano'] = df['Data'].dt.year.fillna(0).astype(int)
         df['Respondido'] = df['DataSaida'].notna()
         for col in ['Requerente', 'Orgao', 'Bairro', 'Status']:
             if col in df.columns:
@@ -194,7 +223,7 @@ def load_data():
                 df[col] = df[col].replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar Excel: {e}")
+        st.error(f"Erro ao conectar com Google Sheets: {e}")
         return pd.DataFrame()
 
 # --- LÓGICA DE RELATÓRIO HTML ---
@@ -211,8 +240,7 @@ def gerar_grafico_html(df_input, coluna_grupo, cor_classe):
 
 def exportar_html(df_filtrado, estilo_mapa):
     try:
-        with open("relatorio.html", "r", encoding="utf-8") as f:
-            template = f.read()
+        with open("relatorio.html", "r", encoding="utf-8") as f: template = f.read()
         counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
         counts.columns = ['Bairro', 'Quantidade']
         counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
@@ -221,144 +249,101 @@ def exportar_html(df_filtrado, estilo_mapa):
         fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", color="Quantidade", color_continuous_scale='Plasma', size_max=20, mapbox_style=estilo_mapa)
         fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
-        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png"))
-        html = html.replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
-        html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado)))
-        html = html.replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum())))
-        html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
-        html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"))
-        html = html.replace("{{PERIODO}}", "Geral")
-        html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue'))
-        html = html.replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green'))
-        html = html.replace("{{CHART_BAIRROS}}", gerar_grafico_html(df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO'], 'Bairro', 'violet'))
+        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png")).replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
+        html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado))).replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum()))).replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
+        html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")).replace("{{PERIODO}}", "Geral")
+        html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue')).replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green')).replace("{{CHART_BAIRROS}}", gerar_grafico_html(df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO'], 'Bairro', 'violet'))
         status_stats = df_filtrado.groupby('Status').size().reset_index(name='Qtd').sort_values('Qtd', ascending=False)
-        max_s = status_stats['Qtd'].max() if not status_stats.empty else 1
-        status_html = ""
-        for _, row in status_stats.iterrows():
-            p = (row['Qtd'] / max_s * 100)
-            status_html += f'<div class="chart-row"><div class="chart-label"><span>{row["Status"]}</span><span>{row["Qtd"]}</span></div><div class="bar-outer"><div class="bar-inner-respondido bar-orange-dark" style="width: {p}%;"></div></div></div>'
+        status_html = "".join([f'<div class="chart-row"><div class="chart-label"><span>{r["Status"]}</span><span>{r["Qtd"]}</span></div><div class="bar-outer"><div class="bar-inner-respondido bar-orange-dark" style="width: {(r["Qtd"]/status_stats["Qtd"].max()*100)}%;"></div></div></div>' for _, r in status_stats.iterrows()])
         html = html.replace("{{CHART_STATUS}}", status_html)
         return html
-    except Exception as e:
-        return f"Erro ao gerar: {e}"
+    except Exception as e: return f"Erro: {e}"
 
 # ----------------- UI -----------------
-# Sidebar - Logo e Controles
 with st.sidebar:
-    if os.path.exists("logo.png"): 
-        st.image("logo.png", use_container_width=True)
-        st.write("") 
+    if os.path.exists("logo.png"): st.image("logo.png", use_container_width=True); st.write("")
     st.header("🔍 Painel de Controle")
 
-# Cabeçalho Principal Totalmente Centralizado
-st.markdown("""
-    <div style='text-align: center; padding: 30px 0;'>
-        <h1 style='color: #113359; font-family: Inter, sans-serif; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 0;'>
-            Solicitações - Câmara dos Deputados
-        </h1>
-        <p style='color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.85rem;'>
-            Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar
-        </p>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
 
-df = load_data()
-if df.empty: st.error("Arquivo Excel não encontrado."); st.stop()
+with st.spinner("Carregando dados da nuvem..."):
+    df = load_data()
 
-# ESTADO DE SESSÃO
+if df.empty: st.error("Erro ao carregar dados. Verifique a planilha e credenciais."); st.stop()
+
 for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
 
-# Sidebar - Filtros
-anos_disponiveis = sorted([int(a) for a in df['Ano'].unique() if a > 0]) # LISTA DE ANOS LIMPOS
-ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_disponiveis, default=anos_disponiveis)
+# Sidebar Filtros
+anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
+ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_dis, default=anos_dis)
+estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-positron", "carto-darkmatter"], index=0)
 
-# APLICAÇÃO FILTROS
+st.sidebar.divider()
+if st.sidebar.button("Preparar Relatório"):
+    with st.spinner("Gerando..."):
+        rel_html = exportar_html(df.copy(), estilo_mapa)
+        st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
+
+if st.sidebar.button("Limpar Filtros"):
+    st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = None; st.rerun()
+
+# Filtros
 df_f = df.copy()
 if ano_sel: df_f = df_f[df_f['Ano'].isin(ano_sel)]
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
 
-estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-positron", "carto-darkmatter"], index=0)
-
-st.sidebar.divider()
-st.sidebar.subheader("📄 Exportação")
-if st.sidebar.button("Preparar Relatório"):
-    with st.spinner("Compilando dados..."):
-        rel_html = exportar_html(df_f, estilo_mapa)
-        st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
-
-if st.sidebar.button("Limpar Todos os Filtros"):
-    st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = None
-    st.rerun()
-
 # --- MAPA ---
 st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
-map_df_base = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
-map_df_base.columns = ['Bairro', 'Quantidade']
-map_df_base['lat_lon'] = map_df_base['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None]))
-map_df_base['lat'] = [c[0] for c in map_df_base['lat_lon']]
-map_df_base['lon'] = [c[1] for c in map_df_base['lat_lon']]
-map_ready = map_df_base.dropna(subset=['lat', 'lon']).copy()
-
+map_counts = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
+map_counts.columns = ['Bairro', 'Quantidade']
+map_counts['lat'] = map_counts['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None])[0])
+map_counts['lon'] = map_counts['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None])[1])
+map_ready = map_counts.dropna(subset=['lat', 'lon'])
 fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
 fig_map.update_layout(height=550, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
 sel_map = st.plotly_chart(fig_map, use_container_width=True, on_select="rerun")
 if sel_map and sel_map["selection"]["points"]:
-    st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]
-    st.rerun()
+    st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]; st.rerun()
 
 # --- MÉTRICAS ---
 st.write("")
-m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
-with m_col1: st.markdown(f"<div class='metric-card'><div class='metric-label'>Solicitações</div><div class='metric-value'>{len(df_f)}</div></div>", unsafe_allow_html=True)
-with m_col2: st.markdown(f"<div class='metric-card'><div class='metric-label'>Respondidos</div><div class='metric-value'>{int(df_f['Respondido'].sum())}</div></div>", unsafe_allow_html=True)
-with m_col3: st.markdown(f"<div class='metric-card'><div class='metric-label'>Requerentes</div><div class='metric-value'>{df_f['Requerente'].nunique()}</div></div>", unsafe_allow_html=True)
-with m_col4: st.markdown(f"<div class='metric-card'><div class='metric-label'>Órgãos</div><div class='metric-value'>{df_f['Orgao'].nunique()}</div></div>", unsafe_allow_html=True)
-with m_col5: st.markdown(f"<div class='metric-card'><div class='metric-label'>Bairros</div><div class='metric-value'>{df_f['Bairro'].nunique()}</div></div>", unsafe_allow_html=True)
+m_col = st.columns(5)
+metrics = [("Solicitações", len(df_f)), ("Respondidos", int(df_f['Respondido'].sum())), ("Requerentes", df_f['Requerente'].nunique()), ("Órgãos", df_f['Orgao'].nunique()), ("Bairros", df_f['Bairro'].nunique())]
+for i, (label, val) in enumerate(metrics):
+    with m_col[i]: st.markdown(f"<div class='metric-card'><div class='metric-label'>{label}</div><div class='metric-value'>{val}</div></div>", unsafe_allow_html=True)
 
 # --- TABELAS ---
 def criar_tabela_tech(df_input, col, titulo, icone, key, cor):
     if df_input.empty: return
     stats = df_input.groupby(col).agg(Qtd=('Respondido', 'count'), Resp=('Respondido', 'sum')).reset_index()
-    stats['%'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0)
-    stats = stats.sort_values('Qtd', ascending=False)
+    stats['%'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0); stats = stats.sort_values('Qtd', ascending=False)
     st.markdown(f"<div class='table-header-bar'>{icone} {titulo}</div>", unsafe_allow_html=True)
     sel = st.dataframe(stats[[col, 'Qtd', '%']], column_config={col: st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "%": st.column_config.ProgressColumn("%", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, use_container_width=True, on_select="rerun")
-    if sel and sel["selection"]["rows"]:
-        st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]
-        st.rerun()
+    if sel and sel["selection"]["rows"]: st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]; st.rerun()
 
 criar_tabela_tech(df_f, 'Requerente', "Desempenho por Requerente", "👤", 'click_req', "blue")
 criar_tabela_tech(df_f, 'Orgao', "Desempenho por Órgão", "🏢", 'click_org', "green")
 criar_tabela_tech(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "Solicitações por Bairro", "📍", 'click_bairro', "violet")
 
-# --- STATUS BOARD (ORDEM DECRESCENTE + CORES CUSTOM) ---
+# --- STATUS BOARD ---
 st.markdown("<div class='section-header'>📌 Situação dos Atendimentos</div>", unsafe_allow_html=True)
 if not df_f.empty:
     status_counts = df_f['Status'].value_counts().reset_index().sort_values('count', ascending=False)
     total_s = status_counts['count'].sum()
     for _, row in status_counts.iterrows():
         p = (row['count'] / total_s) * 100
-        cor = "#636EFA" # Default
+        cor = "#636EFA"
         status_up = str(row['Status']).upper()
         if status_up in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
         elif status_up in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
         elif status_up in ['EM ANDAMENTO', 'PARCIAL']: cor = "#8B5CF6"
         elif status_up in ['PENDENTE', 'AGUARDANDO']: cor = "#FACC15"
         elif status_up == 'NÃO INFORMADO': cor = "#94a3b8"
-        st.markdown(f"""
-            <div class='status-item'>
-                <div class='status-label-row'>
-                    <span>{row['Status']}</span>
-                    <span>{row['count']} ({p:.1f}%)</span>
-                </div>
-                <div class='status-bar-bg'>
-                    <div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
 st.write("")
 with st.expander("📄 Base de Dados Completa"):
