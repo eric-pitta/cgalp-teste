@@ -61,6 +61,7 @@ def load_data():
         if os.path.exists(json_file):
             creds = Credentials.from_service_account_file(json_file, scopes=scope)
         elif "gcp_service_account" in st.secrets:
+            creds_info = st.secrets["gcp_service_account"]
             creds_dict = {
                 "type": creds_info["type"], "project_id": creds_info["project_id"],
                 "private_key_id": creds_info["private_key_id"], "private_key": creds_info["private_key"].replace("\\n", "\n"),
