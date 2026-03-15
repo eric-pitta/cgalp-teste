@@ -30,11 +30,10 @@
             text-align: left;
         }
 
-        header img { max-width: 1000px; height: auto; }
+        header img { max-width: 250px; height: auto; }
 
         main { flex: 1; padding: 40px 5%; }
 
-        /* Mapa muito maior para evitar cortes */
         .map-section {
             width: 100%;
             height: 600px;
@@ -135,12 +134,12 @@
         <p style="color: #666;">Gerado em: {{DATA_GERACAO}} | {{PERIODO}}</p>
 
         <div class="metrics-container">
-            <div class="metric-box"><div class="label">Solicitações</div><div class="value">{{TOTAL_SOLIC}}</div></div>
+            <div class="metric-box"><div class="label">Indicações</div><div class="value">{{TOTAL_SOLIC}}</div></div>
             <div class="metric-box"><div class="label">Respondidos</div><div class="value">{{TOTAL_RESP}}</div></div>
-            <div class="metric-box"><div class="label">Bairros</div><div class="value">{{TOTAL_BAIRROS}}</div></div>
+            <div class="metric-box"><div class="label">Bairros Atendidos</div><div class="value">{{TOTAL_BAIRROS}}</div></div>
         </div>
 
-        <div class="section-title">👤 Desempenho por Requerente</div>
+        <div class="section-title">👤 Desempenho por Vereador</div>
         {{CHART_REQUERENTES}}
 
         <div class="section-title">🏢 Demandas por Órgão</div>
@@ -149,7 +148,7 @@
         <div class="section-title">📍 Distribuição por Bairro</div>
         {{CHART_BAIRROS}}
 
-        <div class="section-title">📌 Situação dos Atendimentos</div>
+        <div class="section-title">📌 Situação das Indicações</div>
         {{CHART_STATUS}}
 
     </main>
