@@ -179,50 +179,72 @@ def load_data():
         elif "gcp_service_account" in st.secrets:
             creds_info = st.secrets["gcp_service_account"]
             creds_dict = {
-                "type": creds_info["type"], "project_id": creds_info["project_id"],
+                "type": creds_info["type"],
+                "project_id": creds_info["project_id"],
                 "private_key_id": creds_info["private_key_id"],
                 "private_key": creds_info["private_key"].replace("\\n", "\n"),
-                "client_email": creds_info["client_email"], "client_id": creds_info["client_id"],
-                "auth_uri": creds_info["auth_uri"], "token_uri": creds_info["token_uri"],
+                "client_email": creds_info["client_email"],
+                "client_id": creds_info["client_id"],
+                "auth_uri": creds_info["auth_uri"],
+                "token_uri": creds_info["token_uri"],
                 "auth_provider_x509_cert_url": creds_info["auth_provider_x509_cert_url"],
                 "client_x509_cert_url": creds_info["client_x509_cert_url"]
             }
             creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         else:
-            st.error("Credenciais não encontradas."); return pd.DataFrame()
+            st.error("Credenciais não encontradas.")
+            return pd.DataFrame()
             
         client = gspread.authorize(creds)
         spreadsheet = client.open_by_key("1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk")
+        
         gids = [151993621, 2138173973, 1659318255, 94298383, 168990156]
         df_list = []
         all_worksheets = spreadsheet.worksheets()
+        
         for gid in gids:
             worksheet = next((ws for ws in all_worksheets if ws.id == gid), None)
             if worksheet:
                 data = worksheet.get_all_records()
                 if data:
                     temp_df = pd.DataFrame(data)
-                    col_mapping = {'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data', 'Ementa': 'Assunto', 'Assunto': 'Assunto', 'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente', 'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao', 'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro', 'Atendimento': 'Status', 'Data da Saída': 'DataSaida'}
-                    temp_df.rename(columns=col_mapping, inplace=True); df_list.append(temp_df)
+                    col_mapping = {
+                        'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data',
+                        'Ementa': 'Assunto', 'Assunto': 'Assunto',
+                        'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente',
+                        'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao',
+                        'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro',
+                        'Atendimento': 'Status', 'Data da Saída': 'DataSaida'
+                    }
+                    temp_df.rename(columns=col_mapping, inplace=True)
+                    df_list.append(temp_df)
+        
         if not df_list: return pd.DataFrame()
         df = pd.concat(df_list, ignore_index=True)
+        
         if 'Data' in df.columns:
             df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
             df['Ano'] = df['Data'].dt.year.fillna(0).astype(int)
         df['Respondido'] = df['DataSaida'].notna()
         for col in ['Requerente', 'Orgao', 'Bairro', 'Status']:
             if col in df.columns:
-                df[col] = df[col].astype(str).str.strip().str.upper().replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
+                df[col] = df[col].astype(str).str.strip().str.upper()
+                df[col] = df[col].replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
         return df
     except Exception as e:
-        st.error(f"Erro crítico na conexão Google: {e}"); return pd.DataFrame()
+        st.error(f"Erro crítico na conexão Google: {e}")
+        return pd.DataFrame()
 
-# --- LÓGICA RELATÓRIO ---
+# --- LÓGICA DE RELATÓRIO HTML ---
 def gerar_grafico_html(df_input, coluna_grupo, cor_classe):
     if df_input.empty: return "<p>Sem dados.</p>"
     stats = df_input.groupby(coluna_grupo).agg(Total=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index().sort_values('Total', ascending=False)
     max_val = stats['Total'].max()
-    html_items = "".join([f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {(row["Total"]/max_val*100)}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {(row["Respondidos"]/max_val*100)}%;"></div></div></div>' for _, row in stats.iterrows()])
+    html_items = ""
+    for _, row in stats.iterrows():
+        perc_total = (row['Total'] / max_val * 100)
+        perc_resp = (row['Respondidos'] / max_val * 100)
+        html_items += f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {perc_total}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {perc_resp}%;"></div></div></div>'
     return html_items
 
 def exportar_html(df_filtrado, estilo_mapa):
@@ -257,12 +279,27 @@ with st.sidebar:
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
 
-with st.spinner("Carregando dados da nuvem..."): df = load_data()
+with st.spinner("Carregando dados..."):
+    df = load_data()
+
 if df.empty: st.stop()
 
 # --- ESTADO DE SESSÃO INICIAL ---
 for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
+
+# --- LÓGICA DE RESET CORRIGIDA (CALLBACK) ---
+def limpar_filtros():
+    st.session_state.click_req = None
+    st.session_state.click_org = None
+    st.session_state.click_bairro = None
+    # Removendo chaves dos widgets para forçar o reset total
+    chaves_para_limpar = ["sb_ano", "sb_req", "sb_bairro", "sb_status"]
+    for k in chaves_para_limpar:
+        if k in st.session_state:
+            del st.session_state[k]
+
+st.sidebar.button("Limpar Todos os Filtros", on_click=limpar_filtros)
 
 # --- FILTROS SIDEBAR ---
 anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
@@ -285,25 +322,19 @@ if st.sidebar.button("Preparar Relatório"):
         rel_html = exportar_html(df.copy(), estilo_mapa)
         st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
 
-# --- BOTÃO LIMPAR FILTROS CORRIGIDO ---
-if st.sidebar.button("Limpar Todos os Filtros"):
-    st.session_state.click_req = None
-    st.session_state.click_org = None
-    st.session_state.click_bairro = None
-    st.session_state.sb_req = "TODOS"
-    st.session_state.sb_bairro = "TODOS"
-    st.session_state.sb_status = "TODOS"
-    st.session_state.sb_ano = anos_dis
-    st.rerun()
-
 # --- APLICAÇÃO DE FILTROS ---
 df_f = df.copy()
-if st.session_state.sb_ano: df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
-if st.session_state.sb_req != "TODOS": df_f = df_f[df_f['Requerente'] == st.session_state.sb_req]
-if st.session_state.sb_bairro != "TODOS": df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro]
-if st.session_state.sb_status != "TODOS": df_f = df_f[df_f['Status'] == st.session_state.sb_status]
+# Prioridade para os filtros da Sidebar
+if "sb_ano" in st.session_state and st.session_state.sb_ano:
+    df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
+if "sb_req" in st.session_state and st.session_state.sb_req != "TODOS":
+    df_f = df_f[df_f['Requerente'] == st.session_state.sb_req]
+if "sb_bairro" in st.session_state and st.session_state.sb_bairro != "TODOS":
+    df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro]
+if "sb_status" in st.session_state and st.session_state.sb_status != "TODOS":
+    df_f = df_f[df_f['Status'] == st.session_state.sb_status]
 
-# Filtros por clique nas tabelas (Cross-filtering)
+# Sincronização com cliques nas tabelas (Cross-filtering)
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
@@ -348,13 +379,14 @@ if not df_f.empty:
     total_s = status_counts['count'].sum()
     for _, row in status_counts.iterrows():
         p = (row['count'] / total_s) * 100
+        # Mapeamento de Cores
         cor = "#636EFA"
-        status_up = str(row['Status']).upper()
-        if status_up in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
-        elif status_up in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
-        elif status_up in ['EM ANDAMENTO','PENDENTE' ]: cor = "#EEF65C"
-        elif status_up in ['PARCIAL', 'AGUARDANDO']: cor = "#15E7FA"
-        elif status_up == 'NÃO INFORMADO': cor = "#94a3b8"
+        status_upper = str(row['Status']).upper()
+        if status_upper in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
+        elif status_upper in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
+        elif status_upper in ['EM ANDAMENTO','PENDENTE' ]: cor = "#EEF65C"
+        elif status_upper in ['PARCIAL', 'AGUARDANDO']: cor = "#15E7FA"
+        elif status_upper == 'NÃO INFORMADO': cor = "#94a3b8"
         st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
 st.write("")
