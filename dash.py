@@ -264,7 +264,7 @@ def exportar_html(df_filtrado, estilo_mapa):
         fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", color="Quantidade", color_continuous_scale='Plasma', size_max=20, mapbox_style=estilo_mapa)
         fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
-        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png")).replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
+        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo2.png")).replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
         html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado))).replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum()))).replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
         html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")).replace("{{PERIODO}}", "Geral")
         html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue')).replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green')).replace("{{CHART_BAIRROS}}", gerar_grafico_html(df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO'], 'Bairro', 'violet'))
