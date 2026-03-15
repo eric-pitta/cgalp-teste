@@ -267,7 +267,7 @@ def exportar_html(df_filtrado, estilo_mapa):
 
 # ----------------- UI -----------------
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png", use_container_width=True); st.write("")
+    if os.path.exists("logo.png"): st.image("logo.png", width="stretch"); st.write("")
     st.header("🔍 Painel de Controle")
 
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
@@ -311,7 +311,7 @@ map_counts['lon'] = map_counts['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(n
 map_ready = map_counts.dropna(subset=['lat', 'lon'])
 fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
 fig_map.update_layout(height=550, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
-sel_map = st.plotly_chart(fig_map, use_container_width=True, on_select="rerun")
+sel_map = st.plotly_chart(fig_map, width="stretch", on_select="rerun")
 if sel_map and sel_map["selection"]["points"]:
     st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]; st.rerun()
 
@@ -328,7 +328,7 @@ def criar_tabela_tech(df_input, col, titulo, icone, key, cor):
     stats = df_input.groupby(col).agg(Qtd=('Respondido', 'count'), Resp=('Respondido', 'sum')).reset_index()
     stats['%'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0); stats = stats.sort_values('Qtd', ascending=False)
     st.markdown(f"<div class='table-header-bar'>{icone} {titulo}</div>", unsafe_allow_html=True)
-    sel = st.dataframe(stats[[col, 'Qtd', '%']], column_config={col: st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "%": st.column_config.ProgressColumn("%", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, use_container_width=True, on_select="rerun")
+    sel = st.dataframe(stats[[col, 'Qtd', '%']], column_config={col: st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "%": st.column_config.ProgressColumn("%", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, width="stretch", on_select="rerun")
     if sel and sel["selection"]["rows"]: st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]; st.rerun()
 
 criar_tabela_tech(df_f, 'Requerente', "Desempenho por Requerente", "👤", 'click_req', "blue")
@@ -353,4 +353,5 @@ if not df_f.empty:
 
 st.write("")
 with st.expander("📄 Base de Dados Completa"):
-    st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], use_container_width=True)
+    st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], width="stretch")
+
