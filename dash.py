@@ -171,17 +171,20 @@ BAIRROS_RJ_COORDS = {
 def load_data():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        json_file = 'bot-consultor-10-10e87b7a88cd.json'
         
-        # Tenta carregar dos Secrets (Nuvem) ou JSON local
-        if "gcp_service_account" in st.secrets:
+        # 1. Tenta carregar o arquivo JSON local primeiro (Ambiente Local)
+        if os.path.exists(json_file):
+            creds = Credentials.from_service_account_file(json_file, scopes=scope)
+        
+        # 2. Se não houver arquivo local, tenta carregar dos Secrets (Ambiente de Nuvem)
+        elif "gcp_service_account" in st.secrets:
             creds_info = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        
         else:
-            json_file = 'bot-consultor-10-10e87b7a88cd.json'
-            if not os.path.exists(json_file):
-                st.error("Arquivo de credenciais não encontrado.")
-                return pd.DataFrame()
-            creds = Credentials.from_service_account_file(json_file, scopes=scope)
+            st.error("Credenciais Google não encontradas (Local ou Nuvem).")
+            return pd.DataFrame()
             
         client = gspread.authorize(creds)
         sheet_id = "1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk"
