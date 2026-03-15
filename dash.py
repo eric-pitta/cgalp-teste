@@ -276,9 +276,13 @@ def exportar_html(df_filtrado, estilo_mapa):
 
 # ----------------- UI -----------------
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png", width=110); st.write("")
+    if os.path.exists("logo.png"):
+        # Centralização da Logo via Colunas
+        side_col1, side_col2, side_col3 = st.columns([1, 2, 1])
+        with side_col2:
+            st.image("logo.png", width=80)
+        st.write("")  
     st.header("Painel de Controle")
-
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
 
