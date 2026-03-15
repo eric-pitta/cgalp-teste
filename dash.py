@@ -7,6 +7,8 @@ import base64
 import gspread
 from google.oauth2.service_account import Credentials
 import io
+import time
+from geopy.geocoders import Nominatim
 
 # Configuração da Página
 st.set_page_config(page_title="Monitoramento CGALP", layout="wide", page_icon="📊")
@@ -153,7 +155,7 @@ def normalizar(texto):
     texto = str(texto).upper().strip()
     return "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
 
-# DICIONÁRIO DE COORDENADAS
+# DICIONÁRIO DE COORDENADAS (Cache Rápido para os mais comuns)
 BAIRROS_RJ_COORDS = {
     'CENTRO': [-22.9035, -43.1823], 'COPACABANA': [-22.9698, -43.1847], 'TIJUCA': [-22.9301, -43.2367],
     'BARRA DA TIJUCA': [-23.0003, -43.3659], 'CAMPO GRANDE': [-22.9027, -43.5591], 'BANGU': [-22.8753, -43.4667],
@@ -163,8 +165,32 @@ BAIRROS_RJ_COORDS = {
     'REALENGO': [-22.8833, -43.4333], 'LEBLON': [-22.9844, -43.2231], 'GRAJAU': [-22.9231, -43.2625],
     'VILA ISABEL': [-22.9167, -43.2458], 'PENHA': [-22.8333, -43.2833], 'PAVUNA': [-22.8058, -43.3644],
     'VAZ LOBO': [-22.8533, -43.3267], 'ITANHANGA': [-22.9833, -43.3000], 'TOMAS COELHO': [-22.8722, -43.3047],
-    'OLARIA': [-22.8422, -43.2567], 'RAMOS': [-22.8458, -43.2458]
+    'OLARIA': [-22.8422, -43.2567], 'RAMOS': [-22.8458, -43.2458], 'RIO COMPRIDO': [-22.9264, -43.2086],
+    'COELHO NETO': [-22.8275, -43.3442]
 }
+
+# FUNÇÃO HÍBRIDA DE GEOCODIFICAÇÃO (Inteligente e Automática)
+@st.cache_data(show_spinner=False)
+def obter_coordenadas(bairro):
+    bairro_norm = normalizar(bairro)
+    
+    # 1. Tenta achar no dicionário local (instantâneo)
+    if bairro_norm in BAIRROS_RJ_COORDS:
+        return BAIRROS_RJ_COORDS[bairro_norm]
+        
+    # 2. Se for um bairro novo, busca na API focando estritamente no RJ
+    geolocator = Nominatim(user_agent="monitoramento_cgalp_rj")
+    query = f"{bairro}, Rio de Janeiro, RJ, Brasil"
+    
+    try:
+        time.sleep(1) # Pausa obrigatória de 1s para não ser bloqueado pelo OpenStreetMap
+        location = geolocator.geocode(query)
+        if location:
+            return [location.latitude, location.longitude]
+    except Exception:
+        pass # Ignora silenciosamente se a internet falhar
+        
+    return [None, None]
 
 # --- CARREGAMENTO GOOGLE SHEETS HÍBRIDO ---
 @st.cache_data(ttl=600)
@@ -252,12 +278,17 @@ def exportar_html(df_filtrado, estilo_mapa):
         with open("relatorio.html", "r", encoding="utf-8") as f: template = f.read()
         counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
         counts.columns = ['Bairro', 'Quantidade']
-        counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
-        counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
+        
+        # Uso da geolocalização inteligente no relatório
+        counts['coords'] = counts['Bairro'].apply(obter_coordenadas)
+        counts['lat'] = counts['coords'].apply(lambda x: x[0] if x else None)
+        counts['lon'] = counts['coords'].apply(lambda x: x[1] if x else None)
+        
         map_final = counts.dropna(subset=['lat', 'lon'])
         fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", color="Quantidade", color_continuous_scale='Plasma', size_max=20, mapbox_style=estilo_mapa)
         fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
+        
         html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo2.png")).replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
         html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado))).replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum()))).replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
         html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")).replace("{{PERIODO}}", "Geral")
@@ -288,12 +319,11 @@ if df.empty: st.stop()
 for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
 
-# --- LÓGICA DE RESET CORRIGIDA (CALLBACK) ---
+# --- LÓGICA DE RESET (CALLBACK) ---
 def limpar_filtros():
     st.session_state.click_req = None
     st.session_state.click_org = None
     st.session_state.click_bairro = None
-    # Removendo chaves dos widgets para forçar o reset total
     chaves_para_limpar = ["sb_ano", "sb_req", "sb_bairro", "sb_status"]
     for k in chaves_para_limpar:
         if k in st.session_state:
@@ -324,7 +354,6 @@ if st.sidebar.button("Preparar Relatório"):
 
 # --- APLICAÇÃO DE FILTROS ---
 df_f = df.copy()
-# Prioridade para os filtros da Sidebar
 if "sb_ano" in st.session_state and st.session_state.sb_ano:
     df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
 if "sb_req" in st.session_state and st.session_state.sb_req != "TODOS":
@@ -334,7 +363,6 @@ if "sb_bairro" in st.session_state and st.session_state.sb_bairro != "TODOS":
 if "sb_status" in st.session_state and st.session_state.sb_status != "TODOS":
     df_f = df_f[df_f['Status'] == st.session_state.sb_status]
 
-# Sincronização com cliques nas tabelas (Cross-filtering)
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
@@ -343,14 +371,25 @@ if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state
 st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
 map_counts = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
 map_counts.columns = ['Bairro', 'Quantidade']
-map_counts['lat'] = map_counts['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None])[0])
-map_counts['lon'] = map_counts['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None])[1])
+
+# 1. Indicador visual para não parecer que a tela travou
+with st.spinner("📍 Mapeando novos bairros no sistema (isso pode levar alguns segundos na primeira vez)..."):
+    map_counts['coords'] = map_counts['Bairro'].apply(obter_coordenadas)
+
+map_counts['lat'] = map_counts['coords'].apply(lambda x: x[0] if x else None)
+map_counts['lon'] = map_counts['coords'].apply(lambda x: x[1] if x else None)
+
 map_ready = map_counts.dropna(subset=['lat', 'lon'])
-fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
-fig_map.update_layout(height=550, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
-sel_map = st.plotly_chart(fig_map, width="stretch", on_select="rerun")
-if sel_map and sel_map["selection"]["points"]:
-    st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]; st.rerun()
+
+if not map_ready.empty:
+    fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
+    fig_map.update_layout(height=550, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
+    sel_map = st.plotly_chart(fig_map, width="stretch", on_select="rerun")
+    if sel_map and sel_map["selection"]["points"]:
+        st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]
+        st.rerun()
+else:
+    st.info("Nenhum bairro válido para exibir no mapa com os filtros atuais.")
 
 # --- MÉTRICAS ---
 st.write("")
