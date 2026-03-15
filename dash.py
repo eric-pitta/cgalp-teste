@@ -144,8 +144,7 @@ st.markdown("""
 # Funções Auxiliares
 def get_base64_logo(file_path):
     if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            return base64.b64encode(f.read()).decode()
+        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     return ""
 
 def normalizar(texto):
@@ -173,27 +172,33 @@ def load_data():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         json_file = 'bot-consultor-10-10e87b7a88cd.json'
         
-        # 1. Tenta carregar o arquivo JSON local primeiro (Ambiente Local)
+        creds = None
+        # 1. Local
         if os.path.exists(json_file):
             creds = Credentials.from_service_account_file(json_file, scopes=scope)
-        
-        # 2. Se não houver arquivo local, tenta carregar dos Secrets (Ambiente de Nuvem)
+        # 2. Nuvem (Secrets)
         elif "gcp_service_account" in st.secrets:
-            creds_info = dict(st.secrets["gcp_service_account"])
-            # Tratamento para garantir que as quebras de linha da chave privada sejam lidas corretamente
-            if "private_key" in creds_info:
-                creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
-            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
-        
+            # Captura explícita de todos os campos para evitar o erro "missing fields"
+            creds_dict = {
+                "type": st.secrets["gcp_service_account"]["type"],
+                "project_id": st.secrets["gcp_service_account"]["project_id"],
+                "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+                "private_key": st.secrets["gcp_service_account"]["private_key"].replace("\\n", "\n"),
+                "client_email": st.secrets["gcp_service_account"]["client_email"],
+                "client_id": st.secrets["gcp_service_account"]["client_id"],
+                "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+                "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+                "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"],
+                "universe_domain": st.secrets["gcp_service_account"].get("universe_domain", "googleapis.com")
+            }
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         else:
-            st.error("Credenciais Google não encontradas (Local ou Nuvem).")
+            st.error("Credenciais não encontradas.")
             return pd.DataFrame()
             
         client = gspread.authorize(creds)
-        sheet_id = "1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk"
-        spreadsheet = client.open_by_key(sheet_id)
-        
-        # GIDs das abas
+        spreadsheet = client.open_by_key("1wZrs1u09oD5yQTVrBuFFmCWavJGMS_-l3Gic8jz3aZk")
         gids = [151993621, 2138173973, 1659318255, 94298383, 168990156]
         df_list = []
         all_worksheets = spreadsheet.worksheets()
@@ -204,44 +209,29 @@ def load_data():
                 data = worksheet.get_all_records()
                 if data:
                     temp_df = pd.DataFrame(data)
-                    col_mapping = {
-                        'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data',
-                        'Ementa': 'Assunto', 'Assunto': 'Assunto',
-                        'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente',
-                        'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao',
-                        'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro',
-                        'Atendimento': 'Status', 'Data da Saída': 'DataSaida'
-                    }
-                    temp_df.rename(columns=col_mapping, inplace=True)
-                    df_list.append(temp_df)
+                    col_mapping = {'Data do Recebimento': 'Data', 'Data de Recebimento': 'Data', 'Ementa': 'Assunto', 'Assunto': 'Assunto', 'Deputado(a) Requerente': 'Requerente', 'Requerente': 'Requerente', 'Órgão Requerido': 'Orgao', 'Órgão Demandado': 'Orgao', 'Bairro Da Ocorrência': 'Bairro', 'Bairro da Ocorrência': 'Bairro', 'Atendimento': 'Status', 'Data da Saída': 'DataSaida'}
+                    temp_df.rename(columns=col_mapping, inplace=True); df_list.append(temp_df)
         
         if not df_list: return pd.DataFrame()
         df = pd.concat(df_list, ignore_index=True)
-        
-        # Processamento
         if 'Data' in df.columns:
             df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
             df['Ano'] = df['Data'].dt.year.fillna(0).astype(int)
         df['Respondido'] = df['DataSaida'].notna()
         for col in ['Requerente', 'Orgao', 'Bairro', 'Status']:
             if col in df.columns:
-                df[col] = df[col].astype(str).str.strip().str.upper()
-                df[col] = df[col].replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
+                df[col] = df[col].astype(str).str.strip().str.upper().replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
         return df
     except Exception as e:
         st.error(f"Erro ao conectar com Google Sheets: {e}")
         return pd.DataFrame()
 
-# --- LÓGICA DE RELATÓRIO HTML ---
+# --- LÓGICA RELATÓRIO ---
 def gerar_grafico_html(df_input, coluna_grupo, cor_classe):
     if df_input.empty: return "<p>Sem dados.</p>"
     stats = df_input.groupby(coluna_grupo).agg(Total=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index().sort_values('Total', ascending=False)
     max_val = stats['Total'].max()
-    html_items = ""
-    for _, row in stats.iterrows():
-        perc_total = (row['Total'] / max_val * 100)
-        perc_resp = (row['Respondidos'] / max_val * 100)
-        html_items += f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {perc_total}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {perc_resp}%;"></div></div></div>'
+    html_items = "".join([f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {(row["Total"]/max_val*100)}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {(row["Respondidos"]/max_val*100)}%;"></div></div></div>' for _, row in stats.iterrows()])
     return html_items
 
 def exportar_html(df_filtrado, estilo_mapa):
@@ -273,15 +263,13 @@ with st.sidebar:
 st.markdown("<h1 class='main-title'>Solicitações - Câmara dos Deputados</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
 
-with st.spinner("Carregando dados da nuvem..."):
-    df = load_data()
-
-if df.empty: st.error("Erro ao carregar dados. Verifique a planilha e credenciais."); st.stop()
+with st.spinner("Carregando dados..."): df = load_data()
+if df.empty: st.stop()
 
 for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
 
-# Sidebar Filtros
+# Filtros Sidebar
 anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
 ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_dis, default=anos_dis)
 estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-positron", "carto-darkmatter"], index=0)
@@ -295,14 +283,12 @@ if st.sidebar.button("Preparar Relatório"):
 if st.sidebar.button("Limpar Filtros"):
     st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = None; st.rerun()
 
-# Filtros
 df_f = df.copy()
 if ano_sel: df_f = df_f[df_f['Ano'].isin(ano_sel)]
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
 
-# --- MAPA ---
 st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
 map_counts = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
 map_counts.columns = ['Bairro', 'Quantidade']
@@ -315,14 +301,12 @@ sel_map = st.plotly_chart(fig_map, width="stretch", on_select="rerun")
 if sel_map and sel_map["selection"]["points"]:
     st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]; st.rerun()
 
-# --- MÉTRICAS ---
 st.write("")
 m_col = st.columns(5)
 metrics = [("Solicitações", len(df_f)), ("Respondidos", int(df_f['Respondido'].sum())), ("Requerentes", df_f['Requerente'].nunique()), ("Órgãos", df_f['Orgao'].nunique()), ("Bairros", df_f['Bairro'].nunique())]
 for i, (label, val) in enumerate(metrics):
     with m_col[i]: st.markdown(f"<div class='metric-card'><div class='metric-label'>{label}</div><div class='metric-value'>{val}</div></div>", unsafe_allow_html=True)
 
-# --- TABELAS ---
 def criar_tabela_tech(df_input, col, titulo, icone, key, cor):
     if df_input.empty: return
     stats = df_input.groupby(col).agg(Qtd=('Respondido', 'count'), Resp=('Respondido', 'sum')).reset_index()
@@ -335,7 +319,6 @@ criar_tabela_tech(df_f, 'Requerente', "Desempenho por Requerente", "👤", 'clic
 criar_tabela_tech(df_f, 'Orgao', "Desempenho por Órgão", "🏢", 'click_org', "green")
 criar_tabela_tech(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "Solicitações por Bairro", "📍", 'click_bairro', "violet")
 
-# --- STATUS BOARD ---
 st.markdown("<div class='section-header'>📌 Situação dos Atendimentos</div>", unsafe_allow_html=True)
 if not df_f.empty:
     status_counts = df_f['Status'].value_counts().reset_index().sort_values('count', ascending=False)
@@ -352,6 +335,4 @@ if not df_f.empty:
         st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
 st.write("")
-with st.expander("📄 Base de Dados Completa"):
-    st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], width="stretch")
-
+with st.expander("📄 Base de Dados Completa"): st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], width="stretch")
