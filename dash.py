@@ -7,7 +7,137 @@ import base64
 import io
 
 # Configuração da Página
-st.set_page_config(page_title="Dashboard Câmara RJ", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Monitoramento CGALP", layout="wide", page_icon="📊")
+
+# --- INJEÇÃO DE CSS TECH PREMIUM ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+    
+    html, body, [data-testid="stSidebar"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #fcfcfc;
+    }
+
+    /* Cabeçalho Principal */
+    .main-title {
+        text-align: center;
+        padding: 20px 0 10px 0;
+        color: #113359 !important;
+        font-weight: 900;
+        letter-spacing: -1.5px;
+    }
+
+    /* Títulos de Seção com Gradiente */
+    .section-header {
+        font-size: 1.6rem;
+        font-weight: 900;
+        background: linear-gradient(90deg, #113359 0%, #5CA0D3 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding-bottom: 10px;
+        margin-top: 2.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #f1f5f9;
+    }
+
+    /* Cabeçalho de Tabela Estilo SaaS com Gradiente */
+    .table-header-bar {
+        background: linear-gradient(135deg, #113359 0%, #5CA0D3 100%);
+        color: white;
+        padding: 12px 18px;
+        border-radius: 12px 12px 0 0;
+        font-weight: 700;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 30px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Ajuste da Tabela para encaixar na barra */
+    .stDataFrame {
+        border: 1px solid #113359 !important;
+        border-radius: 0 0 12px 12px !important;
+        overflow: hidden;
+        margin-top: -1px !important;
+    }
+
+    /* Cartões de Métricas Estilo SaaS */
+    .metric-card {
+        background: #ffffff;
+        padding: 25px 15px;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        position: relative;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .metric-card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 5px;
+        background: linear-gradient(135deg, #113359 0%, #5CA0D3 100%);
+        border-radius: 16px 16px 0 0;
+    }
+    .metric-card:hover {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        transform: translateY(-5px);
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+    }
+    .metric-value {
+        font-size: 2.2rem;
+        color: #0f172a;
+        font-weight: 900;
+    }
+
+    /* Sidebar e Filtros */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
+    }
+    
+    /* Estilização das Tags do Multiselect (Filtro de Ano) */
+    span[data-baseweb="tag"] {
+        background-color: #113359 !important;
+        border-radius: 4px !important;
+    }
+    span[data-baseweb="tag"] span {
+        color: white !important;
+    }
+
+    /* Botões Laterais */
+    div.stButton > button {
+        background: linear-gradient(135deg, #113359 0%, #5CA0D3 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        width: 100%;
+    }
+    div.stButton > button:hover {
+        opacity: 0.9;
+        color: white;
+    }
+
+    /* Status Progress Board */
+    .status-item { margin-bottom: 20px; padding: 15px; background: white; border-radius: 12px; border: 1px solid #f1f5f9; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .status-label-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem; font-weight: 700; color: #1e293b; text-transform: uppercase; }
+    .status-bar-bg { background: #e2e8f0; border-radius: 10px; height: 12px; width: 100%; overflow: hidden; }
+    .status-bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease-in-out; }
+    </style>
+""", unsafe_allow_html=True)
 
 # Funções Auxiliares
 def get_base64_logo(file_path):
@@ -56,7 +186,7 @@ def load_data():
         df = pd.concat(df_list, ignore_index=True)
         if 'Data' in df.columns:
             df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
-            df['Ano'] = df['Data'].dt.year
+            df['Ano'] = df['Data'].dt.year.fillna(0).astype(int) # REMOVE O .0
         df['Respondido'] = df['DataSaida'].notna()
         for col in ['Requerente', 'Orgao', 'Bairro', 'Status']:
             if col in df.columns:
@@ -76,56 +206,31 @@ def gerar_grafico_html(df_input, coluna_grupo, cor_classe):
     for _, row in stats.iterrows():
         perc_total = (row['Total'] / max_val * 100)
         perc_resp = (row['Respondidos'] / max_val * 100)
-        html_items += f"""
-        <div class="chart-row">
-            <div class="chart-label">
-                <span>{row[coluna_grupo]}</span>
-                <span class="stats-info">{int(row['Respondidos'])} respondidos de {int(row['Total'])}</span>
-            </div>
-            <div class="bar-outer">
-                <div class="bar-inner-total bar-{cor_classe}-light" style="width: {perc_total}%;"></div>
-                <div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {perc_resp}%;"></div>
-            </div>
-        </div>"""
+        html_items += f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {perc_total}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {perc_resp}%;"></div></div></div>'
     return html_items
 
 def exportar_html(df_filtrado, estilo_mapa):
     try:
         with open("relatorio.html", "r", encoding="utf-8") as f:
             template = f.read()
-        
-        # Mapa incorporado como HTML do Plotly (Não precisa de Kaleido!)
         counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
         counts.columns = ['Bairro', 'Quantidade']
         counts['lat'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[0])
         counts['lon'] = counts['Bairro'].apply(lambda b: BAIRROS_RJ_COORDS.get(normalizar(b), [None, None])[1])
         map_final = counts.dropna(subset=['lat', 'lon'])
-        
-        fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", 
-                                    color="Quantidade", color_continuous_scale='Plasma', size_max=20,
-                                    mapbox_style=estilo_mapa)
-        fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), 
-                                coloraxis_colorbar=dict(orientation='h', y=-0.1), 
-                                margin=dict(l=0, r=0, t=0, b=0))
-        
-        # Transforma o mapa em um componente HTML interativo
+        fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", color="Quantidade", color_continuous_scale='Plasma', size_max=20, mapbox_style=estilo_mapa)
+        fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
-        
-        # Substituições
         html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo.png"))
-        # Substituímos a tag de imagem pela div do mapa interativo
         html = html.replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
-        
         html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado)))
         html = html.replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum())))
         html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
         html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"))
-        html = html.replace("{{PERIODO}}", "Relatório Filtrado" if st.session_state.click_req else "Geral")
-        
+        html = html.replace("{{PERIODO}}", "Geral")
         html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue'))
         html = html.replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green'))
         html = html.replace("{{CHART_BAIRROS}}", gerar_grafico_html(df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO'], 'Bairro', 'violet'))
-        
         status_stats = df_filtrado.groupby('Status').size().reset_index(name='Qtd').sort_values('Qtd', ascending=False)
         max_s = status_stats['Qtd'].max() if not status_stats.empty else 1
         status_html = ""
@@ -133,32 +238,40 @@ def exportar_html(df_filtrado, estilo_mapa):
             p = (row['Qtd'] / max_s * 100)
             status_html += f'<div class="chart-row"><div class="chart-label"><span>{row["Status"]}</span><span>{row["Qtd"]}</span></div><div class="bar-outer"><div class="bar-inner-respondido bar-orange-dark" style="width: {p}%;"></div></div></div>'
         html = html.replace("{{CHART_STATUS}}", status_html)
-        
         return html
     except Exception as e:
-        return f"Erro: {e}"
+        return f"Erro ao gerar: {e}"
 
 # ----------------- UI -----------------
-col_logo, col_title = st.columns([1, 3])
-with col_logo:
-    if os.path.exists("logo.png"): st.image("logo.png", width=250)
-with col_title:
-    st.write(""); st.write(""); st.write(""); st.write("")
-    st.markdown("<h1 style='text-align: center;'>📊 Solicitações Câmara dos Deputados</h1>", unsafe_allow_html=True)
+# Sidebar - Logo e Controles
+with st.sidebar:
+    if os.path.exists("logo.png"): 
+        st.image("logo.png", use_container_width=True)
+        st.write("") 
+    st.header("🔍 Painel de Controle")
 
-st.write(""); st.divider()
+# Cabeçalho Principal Totalmente Centralizado
+st.markdown("""
+    <div style='text-align: center; padding: 30px 0;'>
+        <h1 style='color: #113359; font-family: Inter, sans-serif; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 0;'>
+            Solicitações - Câmara dos Deputados
+        </h1>
+        <p style='color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.85rem;'>
+            Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar
+        </p>
+    </div>
+""", unsafe_allow_html=True)
 
 df = load_data()
 if df.empty: st.error("Arquivo Excel não encontrado."); st.stop()
 
 # ESTADO DE SESSÃO
-for key in ['click_req', 'click_org', 'click_bairro', 'click_status']:
+for key in ['click_req', 'click_org', 'click_bairro']:
     if key not in st.session_state: st.session_state[key] = None
 
 # Sidebar - Filtros
-st.sidebar.header("🔍 Filtros")
-anos = sorted(df['Ano'].dropna().unique().tolist())
-ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos, default=anos)
+anos_disponiveis = sorted([int(a) for a in df['Ano'].unique() if a > 0]) # LISTA DE ANOS LIMPOS
+ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_disponiveis, default=anos_disponiveis)
 
 # APLICAÇÃO FILTROS
 df_f = df.copy()
@@ -166,30 +279,22 @@ if ano_sel: df_f = df_f[df_f['Ano'].isin(ano_sel)]
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
-if st.session_state.click_status: df_f = df_f[df_f['Status'] == st.session_state.click_status]
 
 estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["open-street-map", "carto-positron", "carto-darkmatter"], index=0)
 
-# Sidebar - Relatórios
 st.sidebar.divider()
-st.sidebar.subheader("📄 Relatórios")
-if st.sidebar.button("Gerar Relatório"):
-    with st.spinner("Preparando relatório de alta tecnologia..."):
+st.sidebar.subheader("📄 Exportação")
+if st.sidebar.button("Preparar Relatório"):
+    with st.spinner("Compilando dados..."):
         rel_html = exportar_html(df_f, estilo_mapa)
-        st.sidebar.success("✅ Relatório pronto!")
-        st.sidebar.download_button(
-            label="📥 Baixar Relatório HTML",
-            data=rel_html,
-            file_name=f"relatorio_legislativo_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
-            mime="text/html"
-        )
+        st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
 
 if st.sidebar.button("Limpar Todos os Filtros"):
-    st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = st.session_state.click_status = None
+    st.session_state.click_req = st.session_state.click_org = st.session_state.click_bairro = None
     st.rerun()
 
-# ----- MAPA DASHBOARD -----
-st.subheader(f"🗺️ Mapa de Incidências {f' - {st.session_state.click_bairro}' if st.session_state.click_bairro else ''}")
+# --- MAPA ---
+st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
 map_df_base = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
 map_df_base.columns = ['Bairro', 'Quantidade']
 map_df_base['lat_lon'] = map_df_base['Bairro'].apply(lambda x: BAIRROS_RJ_COORDS.get(normalizar(x), [None, None]))
@@ -197,58 +302,64 @@ map_df_base['lat'] = [c[0] for c in map_df_base['lat_lon']]
 map_df_base['lon'] = [c[1] for c in map_df_base['lat_lon']]
 map_ready = map_df_base.dropna(subset=['lat', 'lon']).copy()
 
-fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", 
-                            hover_name="Bairro", color="Quantidade",
-                            color_continuous_scale='Plasma', size_max=40, zoom=10,
-                            mapbox_style=estilo_mapa)
-fig_map.update_layout(height=500, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
-
+fig_map = px.scatter_mapbox(map_ready, lat="lat", lon="lon", size="Quantidade", hover_name="Bairro", color="Quantidade", color_continuous_scale='Plasma', size_max=40, zoom=10, mapbox_style=estilo_mapa)
+fig_map.update_layout(height=550, margin={"r":0,"t":0,"l":0,"b":0}, clickmode='event+select')
 sel_map = st.plotly_chart(fig_map, use_container_width=True, on_select="rerun")
 if sel_map and sel_map["selection"]["points"]:
     st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]
     st.rerun()
 
-st.divider()
+# --- MÉTRICAS ---
+st.write("")
+m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
+with m_col1: st.markdown(f"<div class='metric-card'><div class='metric-label'>Solicitações</div><div class='metric-value'>{len(df_f)}</div></div>", unsafe_allow_html=True)
+with m_col2: st.markdown(f"<div class='metric-card'><div class='metric-label'>Respondidos</div><div class='metric-value'>{int(df_f['Respondido'].sum())}</div></div>", unsafe_allow_html=True)
+with m_col3: st.markdown(f"<div class='metric-card'><div class='metric-label'>Requerentes</div><div class='metric-value'>{df_f['Requerente'].nunique()}</div></div>", unsafe_allow_html=True)
+with m_col4: st.markdown(f"<div class='metric-card'><div class='metric-label'>Órgãos</div><div class='metric-value'>{df_f['Orgao'].nunique()}</div></div>", unsafe_allow_html=True)
+with m_col5: st.markdown(f"<div class='metric-card'><div class='metric-label'>Bairros</div><div class='metric-value'>{df_f['Bairro'].nunique()}</div></div>", unsafe_allow_html=True)
 
-col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
-col_m1.metric("Solicitações", len(df_f))
-col_m2.metric("Respondidos", int(df_f['Respondido'].sum()))
-col_m3.metric("Requerentes", df_f['Requerente'].nunique())
-col_m4.metric("Órgãos", df_f['Orgao'].nunique())
-col_m5.metric("Bairros", df_f['Bairro'].nunique())
-
-st.divider()
-
-def criar_infografico(df_input, coluna_grupo, titulo, key_session, cor_barra):
-    if df_input.empty: st.subheader(titulo); st.info("Sem dados."); return
-    stats = df_input.groupby(coluna_grupo).agg(Quantidade=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index()
-    stats['% Respondido'] = (stats['Respondidos'] / stats['Quantidade'] * 100).fillna(0)
-    stats = stats.sort_values('Quantidade', ascending=False)
-    st.subheader(titulo)
-    sel = st.dataframe(stats[[coluna_grupo, 'Quantidade', '% Respondido']], column_config={coluna_grupo: st.column_config.TextColumn(coluna_grupo.capitalize(), width="medium"), "Quantidade": st.column_config.ProgressColumn("Quantidade", format="%d", min_value=0, max_value=int(stats['Quantidade'].max()) if int(stats['Quantidade'].max()) > 0 else 100, color=cor_barra), "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor_barra)}, hide_index=True, use_container_width=True, on_select="rerun")
+# --- TABELAS ---
+def criar_tabela_tech(df_input, col, titulo, icone, key, cor):
+    if df_input.empty: return
+    stats = df_input.groupby(col).agg(Qtd=('Respondido', 'count'), Resp=('Respondido', 'sum')).reset_index()
+    stats['%'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0)
+    stats = stats.sort_values('Qtd', ascending=False)
+    st.markdown(f"<div class='table-header-bar'>{icone} {titulo}</div>", unsafe_allow_html=True)
+    sel = st.dataframe(stats[[col, 'Qtd', '%']], column_config={col: st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "%": st.column_config.ProgressColumn("%", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, use_container_width=True, on_select="rerun")
     if sel and sel["selection"]["rows"]:
-        st.session_state[key_session] = stats.iloc[sel["selection"]["rows"][0]][coluna_grupo]
+        st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]
         st.rerun()
 
-criar_infografico(df_f, 'Requerente', "👤 Desempenho por Requerente", 'click_req', "blue")
-criar_infografico(df_f, 'Orgao', "🏢 Desempenho por Órgão", 'click_org', "green")
-criar_infografico(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "📍 Solicitações por Bairro", 'click_bairro', "violet")
+criar_tabela_tech(df_f, 'Requerente', "Desempenho por Requerente", "👤", 'click_req', "blue")
+criar_tabela_tech(df_f, 'Orgao', "Desempenho por Órgão", "🏢", 'click_org', "green")
+criar_tabela_tech(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "Solicitações por Bairro", "📍", 'click_bairro', "violet")
 
-st.divider()
-
-st.subheader("📌 Status dos Atendimentos (Clique para filtrar)")
+# --- STATUS BOARD (ORDEM DECRESCENTE + CORES CUSTOM) ---
+st.markdown("<div class='section-header'>📌 Situação dos Atendimentos</div>", unsafe_allow_html=True)
 if not df_f.empty:
-    status_counts = df_f['Status'].value_counts().reset_index()
-    status_counts.columns = ['Status_Label', 'Quantidade']
-    color_map = {'CONCLUÍDO': '#00CC96', 'ATENDIDO': '#00CC96', 'FINALIZADO': '#00CC96', 'PENDENTE': '#EF553B', 'EM ANDAMENTO': '#636EFA', 'AGUARDANDO': '#FFA15A', 'NÃO INFORMADO': '#94a3b8'}
-    fig_status = px.bar(status_counts, x='Quantidade', y='Status_Label', orientation='h', color='Status_Label', color_discrete_map=color_map, text='Quantidade')
-    fig_status.update_traces(textposition='outside', marker_line_width=0, opacity=0.9)
-    fig_status.update_layout(height=400, showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis_showgrid=False, yaxis_showgrid=False, xaxis_visible=False, yaxis_title="", margin=dict(l=0, r=50, t=30, b=0), clickmode='event+select')
-    sel_s = st.plotly_chart(fig_status, use_container_width=True, on_select="rerun")
-    if sel_s and sel_s["selection"]["points"]:
-        st.session_state.click_status = sel_s["selection"]["points"][0]["y"]
-        st.rerun()
+    status_counts = df_f['Status'].value_counts().reset_index().sort_values('count', ascending=False)
+    total_s = status_counts['count'].sum()
+    for _, row in status_counts.iterrows():
+        p = (row['count'] / total_s) * 100
+        cor = "#636EFA" # Default
+        status_up = str(row['Status']).upper()
+        if status_up in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
+        elif status_up in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
+        elif status_up in ['EM ANDAMENTO', 'PARCIAL']: cor = "#8B5CF6"
+        elif status_up in ['PENDENTE', 'AGUARDANDO']: cor = "#FACC15"
+        elif status_up == 'NÃO INFORMADO': cor = "#94a3b8"
+        st.markdown(f"""
+            <div class='status-item'>
+                <div class='status-label-row'>
+                    <span>{row['Status']}</span>
+                    <span>{row['count']} ({p:.1f}%)</span>
+                </div>
+                <div class='status-bar-bg'>
+                    <div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-st.divider()
-with st.expander("📄 Dados Detalhados"):
+st.write("")
+with st.expander("📄 Base de Dados Completa"):
     st.dataframe(df_f[['Data', 'Requerente', 'Bairro', 'Orgao', 'Status', 'Assunto']], use_container_width=True)
