@@ -144,7 +144,8 @@ st.markdown("""
 # Funções Auxiliares
 def get_base64_logo(file_path):
     if os.path.exists(file_path):
-        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
+        with open(file_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
     return ""
 
 def normalizar(texto):
@@ -171,6 +172,7 @@ def load_data():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         json_file = 'bot-consultor-10-10e87b7a88cd.json'
+        
         creds = None
         if os.path.exists(json_file):
             creds = Credentials.from_service_account_file(json_file, scopes=scope)
@@ -258,18 +260,22 @@ st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; tex
 with st.spinner("Carregando dados da nuvem..."): df = load_data()
 if df.empty: st.stop()
 
+# --- ESTADO DE SESSÃO INICIAL ---
+for key in ['click_req', 'click_org', 'click_bairro']:
+    if key not in st.session_state: st.session_state[key] = None
+
 # --- FILTROS SIDEBAR ---
 anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
-ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_dis, default=anos_dis)
+ano_sel = st.sidebar.multiselect("Filtrar por Ano", anos_dis, default=anos_dis, key="sb_ano")
 
 requerentes_dis = ["TODOS"] + sorted(df['Requerente'].unique().tolist())
-req_sel = st.sidebar.selectbox("Filtrar por Requerente", requerentes_dis, index=0)
+req_sel = st.sidebar.selectbox("Filtrar por Requerente", requerentes_dis, index=0, key="sb_req")
 
 bairros_dis = ["TODOS"] + sorted(df['Bairro'].unique().tolist())
-bairro_sel = st.sidebar.selectbox("Filtrar por Bairro", bairros_dis, index=0)
+bairro_sel = st.sidebar.selectbox("Filtrar por Bairro", bairros_dis, index=0, key="sb_bairro")
 
 status_opcoes = ["TODOS"] + sorted(df['Status'].unique().tolist())
-status_sidebar_sel = st.sidebar.selectbox("Filtrar por Situação", status_opcoes, index=0)
+status_sidebar_sel = st.sidebar.selectbox("Filtrar por Situação", status_opcoes, index=0, key="sb_status")
 
 estilo_mapa = st.sidebar.selectbox("Estilo do Mapa", ["carto-positron", "open-street-map", "carto-darkmatter"], index=0)
 
@@ -279,21 +285,25 @@ if st.sidebar.button("Preparar Relatório"):
         rel_html = exportar_html(df.copy(), estilo_mapa)
         st.sidebar.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_cgalp.html", mime="text/html")
 
+# --- BOTÃO LIMPAR FILTROS CORRIGIDO ---
 if st.sidebar.button("Limpar Todos os Filtros"):
-    for key in ['click_req', 'click_org', 'click_bairro']: st.session_state[key] = None
+    st.session_state.click_req = None
+    st.session_state.click_org = None
+    st.session_state.click_bairro = None
+    st.session_state.sb_req = "TODOS"
+    st.session_state.sb_bairro = "TODOS"
+    st.session_state.sb_status = "TODOS"
+    st.session_state.sb_ano = anos_dis
     st.rerun()
 
-# Aplicação de Filtros
+# --- APLICAÇÃO DE FILTROS ---
 df_f = df.copy()
-if ano_sel: df_f = df_f[df_f['Ano'].isin(ano_sel)]
-if req_sel != "TODOS": df_f = df_f[df_f['Requerente'] == req_sel]
-if bairro_sel != "TODOS": df_f = df_f[df_f['Bairro'] == bairro_sel]
-if status_sidebar_sel != "TODOS": df_f = df_f[df_f['Status'] == status_sidebar_sel]
+if st.session_state.sb_ano: df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
+if st.session_state.sb_req != "TODOS": df_f = df_f[df_f['Requerente'] == st.session_state.sb_req]
+if st.session_state.sb_bairro != "TODOS": df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro]
+if st.session_state.sb_status != "TODOS": df_f = df_f[df_f['Status'] == st.session_state.sb_status]
 
-# Sincronização com cliques nas tabelas (Cross-filtering)
-for key in ['click_req', 'click_org', 'click_bairro']:
-    if key not in st.session_state: st.session_state[key] = None
-
+# Filtros por clique nas tabelas (Cross-filtering)
 if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
 if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
 if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
@@ -339,12 +349,12 @@ if not df_f.empty:
     for _, row in status_counts.iterrows():
         p = (row['count'] / total_s) * 100
         cor = "#636EFA"
-        status_upper = str(row['Status']).upper()
-        if status_upper in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
-        elif status_upper in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
-        elif status_upper in ['EM ANDAMENTO','PENDENTE' ]: cor = "#EEF65C"
-        elif status_upper in ['PARCIAL', 'AGUARDANDO']: cor = "#15E7FA"
-        elif status_upper == 'NÃO INFORMADO': cor = "#94a3b8"
+        status_up = str(row['Status']).upper()
+        if status_up in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cor = "#00CC96"
+        elif status_up in ['NÃO', 'EM ATRASO']: cor = "#EF4444"
+        elif status_up in ['EM ANDAMENTO','PENDENTE' ]: cor = "#EEF65C"
+        elif status_up in ['PARCIAL', 'AGUARDANDO']: cor = "#15E7FA"
+        elif status_up == 'NÃO INFORMADO': cor = "#94a3b8"
         st.markdown(f"<div class='status-item'><div class='status-label-row'><span>{row['Status']}</span><span>{row['count']} ({p:.1f}%)</span></div><div class='status-bar-bg'><div class='status-bar-fill' style='width: {p}%; background: {cor}; box-shadow: 0 0 10px {cor}44;'></div></div></div>", unsafe_allow_html=True)
 
 st.write("")
