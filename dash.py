@@ -180,6 +180,9 @@ def load_data():
         # 2. Se não houver arquivo local, tenta carregar dos Secrets (Ambiente de Nuvem)
         elif "gcp_service_account" in st.secrets:
             creds_info = dict(st.secrets["gcp_service_account"])
+            # Tratamento para garantir que as quebras de linha da chave privada sejam lidas corretamente
+            if "private_key" in creds_info:
+                creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
         
         else:
