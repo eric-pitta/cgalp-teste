@@ -1,2 +1,42 @@
 [theme]
 base="light"
+
+[GCP_SERVICE_ACCOUNT]
+TYPE = "service_account"
+PROJECT_ID = "bot-consultor-10"
+PRIVATE_KEY_ID = "10e87b7a88cde8c4d7d8edf4c6cff28d711624c2"
+PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC+y9PrKTa7LlJu
+DGJfZZCjF4SevOu+mOtqdc3JWSGWWuKq2NR1ozNKask+LNst0Cv3QwX49LRvpE68
+PWR00fAOtuQAfnkt6+ZMz02hXU7w+CaIVqNC40soVYOCWUm/WNb4j7MDz4+koIzg
+OX3CrYLt26D48qYrDG/66ysZlJMCjKn8W7IDQpJkiHY+ZSS7domITrGBjGYjTIOR
+XzkV3pzAuuVpt/XHRtUWNMBTp59d7fG/iPflRHi6Ybhz95HxkZT7JP4iqnCxDC7i
+/RXAjtc0IuxtlTNldlcXImZL/tgPQff9J6BliDT92d14rFFCLEe9WcentpSs1oqe
+TPBC7DqdAgMBAAECggEACgKquz9d0kNTate2f5fWF2CAAk4aNlVSoLLOmb5V70wU
+cW9P8l4eLkzdAyiaVVSDQgVftliscOEXinPUJfbv1+3Ll6ULGZgzbJtB0PIS1rzG
+VMfq5/MB+ftGm5uwrVvtZ3wuocgNms8bpRYPHZw57t3jm7wrcL3F0E3vZHexoOQG
+KsvrLtzywX7TsboDy9AmRseTiDDfOrzWBgEMkuqrXOwxrrIkgCNX3eo5MR162MWR
+r389rjOahtKTZ8tCIrDxmyIiLj2d8b0x/z82eOxTL0fH+FRwkAx1BKTmzuXZZBDF
+unB7Y2FXr6ZwX43pJLJ63+dwjh6zb1QCscr/DPoakQKBgQDya/cEFHNUTj0yeSk3
+Z2rBYAstU8vgYB2MydT6jbPQjRxBhJoRedLxyvozarkylmqqLyOYwT+l7m9Q5ITR
+UaoL5g695UrtEa5wObr2r10XErh7EkfNI6bNRNAC4hN9/owh8p97FelYOHih180R
+nd5wYfrztozDZZvID0cs6pevW9QKBgQDJe51zK4O9g6gNyhhWd016b4Y9DtyrwvSJ
+pWYXq8YedpWMoyEBDpcj3GbNu0ex0GD19fPlHqMgatrl82L5XC9u3q69lmT499dE
+wHite2BsXYAW4+1A/sQa605fHErZ3ewp23aNCBfXJod2OM447wj53y4lW5LnwV+0
+RA+Wa5d8CQKBgQDXEU2eQv5mRtsoEjGsw4UEdc60sejn8J2Gr/DRMDHczbPJtHhz
+FJ8+gBMk1oPjC2sp/JQaCygKb9Q18eabRVYVJE7jza6BT/Rv/+eMvttZgvRDy14D
+8qMi7O+V/zfHybJM09EFA9V2vPLYsnluC61iVd4K/YJy/U+sb81bBKSMmQKBgE/0
+TRQCBaJ0F4F5XFUbvNREY3nhZvKGR/JDf5MPKGy4VDpeFd/MgW/Kq8Uid535ejDA
+7ItUsBlSLhGolvMrgOs3VRKJFwKxn2x6EKmPV0FJjWYIBwOO1hV0oUIfARkZ9vjZ
+TV9EAenwMTtZ6YQwX1iBF1fd0htD4o2voJvpkFC5AoGBAMq++3gscBHLv3FQiXli
+0cCk8AJP4zZFXQ7G520O0qLi7O1eqgHDSCjmm65qAAnFThQ4dIFxCCoSx0jpPuXi
+z0Gk3G+c9aEQN8XgmhBZe6Zla4FPuOfgIzIH4ja3Er/e8QsaCCRjZIrRUVoeB1CM
+4g4KkBXFpjphVEIFTs3iTxat
+-----END PRIVATE KEY-----"""
+CLIENT_EMAIL = "bot-consultor-pitta@bot-consultor-10.iam.gserviceaccount.com"
+CLIENT_ID = "111242379679135297051"
+AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
+TOKEN_URI = "https://oauth2.googleapis.com/token"
+AUTH_PROVIDER_X509_CERT_URL = "https://www.googleapis.com/oauth2/v1/certs"
+CLIENT_X509_CERT_URL = "https://www.googleapis.com/robot/v1/metadata/x509/bot-consultor-pitta%40bot-consultor-10.iam.gserviceaccount.com"
+UNIVERSE_DOMAIN = "googleapis.com"
