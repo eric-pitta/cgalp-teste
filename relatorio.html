@@ -6,117 +6,197 @@
     <title>Relatório Executivo - CGALP</title>
     <style>
         :root {
-            --azul-escuro-logo: #113359;
-            --azul-claro-logo: #5CA0D3;
-            --fundo-branco: #ffffff;
-            --fundo-footer: #f9f9f9;
-            --texto-principal: #333333;
-            --verde-sucesso: #10b981;
+            --azul-escuro: #113359;
+            --azul-claro: #5CA0D3;
+            --gradiente: linear-gradient(135deg, #113359 0%, #5CA0D3 100%);
+            --fundo: #fcfcfc;
+            --texto: #334155;
+            --ouro: #FFD700;
+            --prata: #C0C0C0;
+            --bronze: #CD7F32;
+            --verde: #00CC96;
+            --vermelho: #EF4444;
+            --amarelo: #EEF65C;
+            --ciano: #15E7FA;
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             margin: 0; padding: 0;
-            background-color: var(--fundo-branco);
-            color: var(--texto-principal);
-            display: flex; flex-direction: column;
-            min-height: 100vh;
+            background-color: var(--fundo);
+            color: var(--texto);
         }
 
         header {
-            background-color: var(--fundo-branco);
+            background: white;
             padding: 20px 5%;
-            border-bottom: 2px solid var(--azul-claro-logo);
-            text-align: left;
+            border-bottom: 3px solid var(--azul-claro);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        header img { max-width: 1000px; height: auto; }
+        header img { max-height: 80px; }
 
-        main { flex: 1; padding: 40px 5%; }
+        main { padding: 40px 5%; max-width: 1200px; margin: 0 auto; }
 
-        /* Mapa muito maior para evitar cortes */
-        .map-section {
-            width: 100%;
-            height: 600px;
-            margin-bottom: 30px;
-            border-radius: 15px;
-            border: 2px solid var(--azul-claro-logo);
-            overflow: hidden;
-            background-color: #f8fafc;
-        }
-
-        .map-section img { width: 100%; height: 100%; object-fit: contain; }
-
-        .metrics-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+        .report-header {
+            text-align: center;
             margin-bottom: 40px;
         }
 
-        .metric-box {
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-            border-left: 5px solid var(--azul-claro-logo);
-            text-align: center;
+        .report-header h1 {
+            color: var(--azul-escuro);
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -1px;
         }
 
-        .metric-box .label { font-size: 0.85em; color: #64748b; text-transform: uppercase; }
-        .metric-box .value { font-size: 1.8em; font-weight: bold; color: var(--azul-escuro-logo); margin-top: 5px; }
-
-        .section-title {
-            color: var(--azul-escuro-logo);
-            font-size: 1.3em;
-            margin: 45px 0 15px 0;
-            font-weight: bold;
-            border-left: 6px solid var(--azul-escuro-logo);
-            padding-left: 15px;
+        .report-header p {
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.9rem;
+            margin-top: 10px;
         }
 
-        .chart-row { margin-bottom: 20px; }
-
-        .chart-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 1em;
-            margin-bottom: 6px;
-        }
-
-        .chart-label .stats-info { font-weight: bold; color: var(--azul-escuro-logo); }
-
-        .bar-outer {
-            background-color: #e2e8f0;
-            border-radius: 10px;
-            height: 22px;
+        .map-section {
             width: 100%;
+            height: 500px;
+            margin-bottom: 40px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 50px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 25px 15px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .metric-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--gradiente);
+            border-radius: 16px 16px 0 0;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--azul-escuro);
+        }
+
+        .table-header-bar {
+            background: var(--gradiente);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px 12px 0 0;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+        }
+
+        th {
+            background: #f8fafc;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.95rem;
+        }
+
+        .top-1 { color: var(--ouro); font-weight: bold; }
+        .top-2 { color: var(--prata); font-weight: bold; }
+        .top-3 { color: var(--bronze); font-weight: bold; }
+
+        /* Cores de Status */
+        .status-sim { color: var(--verde); font-weight: bold; }
+        .status-nao { color: var(--vermelho); font-weight: bold; }
+        .status-andamento { color: #d97706; font-weight: bold; } /* Amarelo escuro para leitura no branco */
+        .status-parcial { color: #0891b2; font-weight: bold; } /* Ciano escuro */
+
+        .progress-container {
+            width: 100%;
+            background-color: #f1f5f9;
+            border-radius: 10px;
+            height: 8px;
             position: relative;
             overflow: hidden;
+            margin-top: 4px;
         }
 
-        .bar-inner-total { height: 100%; position: absolute; left: 0; top: 0; opacity: 0.3; }
-        .bar-inner-respondido { height: 100%; position: absolute; left: 0; top: 0; z-index: 2; border-right: 2px solid white; }
+        .progress-bar {
+            height: 100%;
+            border-radius: 10px;
+        }
 
-        .bar-blue-light { background-color: var(--azul-claro-logo); }
-        .bar-blue-dark { background-color: var(--azul-escuro-logo); }
-        .bar-green-light { background-color: #bbf7d0; }
-        .bar-green-dark { background-color: var(--verde-sucesso); }
-        .bar-violet-light { background-color: #ddd6fe; }
-        .bar-violet-dark { background-color: #8b5cf6; }
-        .bar-orange-dark { background-color: #fb923c; }
+        .bar-blue { background-color: var(--azul-claro); }
+        .bar-green { background-color: var(--verde); }
+        .bar-violet { background-color: #8b5cf6; }
+        .bar-orange { background-color: #fb923c; }
 
         footer {
-            background-color: var(--fundo-footer);
-            color: var(--azul-escuro-logo);
-            padding: 30px 5%;
+            background: #f8fafc;
+            padding: 40px 5%;
             text-align: center;
-            border-top: 1px solid #e0e0e0;
-            font-size: 0.9em;
+            color: var(--azul-escuro);
+            border-top: 1px solid #e2e8f0;
+            margin-top: 60px;
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
 
         @media print {
-            .map-section { height: 500px; border: none; }
-            main { padding: 10px; }
+            body { background: white; }
+            .metric-card, .map-section { box-shadow: none; border: 1px solid #eee; }
+            .table-header-bar { -webkit-print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -127,36 +207,31 @@
     </header>
 
     <main>
+        <div class="report-header">
+            <h1>{{TITULO_RELATORIO}}</h1>
+            <p>COORDENADORIA GERAL DE ACOMPANHAMENTO LEGISLATIVO E PARLAMENTAR</p>
+            <p style="text-transform: none; color: #64748b;">{{PERIODO}}</p>
+        </div>
+
         <div class="map-section">
-            <img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">
+            {{MAPA_HTML}}
         </div>
 
-        <h1 style="color: var(--azul-escuro-logo);">{{TITULO_RELATORIO}}</h1>
-        <p style="color: #666;">Gerado em: {{DATA_GERACAO}} | {{PERIODO}}</p>
-
-        <div class="metrics-container">
-            <div class="metric-box"><div class="label">Solicitações</div><div class="value">{{TOTAL_SOLIC}}</div></div>
-            <div class="metric-box"><div class="label">Respondidos</div><div class="value">{{TOTAL_RESP}}</div></div>
-            <div class="metric-box"><div class="label">Bairros</div><div class="value">{{TOTAL_BAIRROS}}</div></div>
+        <div class="metrics-grid">
+            <div class="metric-card"><div class="metric-label">{{LABEL_SOLIC}}</div><div class="metric-value">{{TOTAL_SOLIC}}</div></div>
+            <div class="metric-card"><div class="metric-label">Respondidos</div><div class="metric-value">{{TOTAL_RESP}}</div></div>
+            <div class="metric-card"><div class="metric-label">% Respondido</div><div class="metric-value">{{PERC_RESP}}%</div></div>
+            <div class="metric-card"><div class="metric-label">Bairros</div><div class="metric-value">{{TOTAL_BAIRROS}}</div></div>
         </div>
 
-        <div class="section-title">👤 Desempenho por Requerente</div>
-        {{CHART_REQUERENTES}}
-
-        <div class="section-title">🏢 Demandas por Órgão</div>
-        {{CHART_ORGAOS}}
-
-        <div class="section-title">📍 Distribuição por Bairro</div>
-        {{CHART_BAIRROS}}
-
-        <div class="section-title">📌 Situação dos Atendimentos</div>
-        {{CHART_STATUS}}
+        {{TABELAS_HTML}}
 
     </main>
 
     <footer>
         <strong>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar – CGALP</strong><br>
-        Rua Afonso Cavalcanti, 455, 15º andar, Cidade Nova, Rio de Janeiro – RJ | E-mail: cgalp.rio@prefeitura.rio
+        Rua Afonso Cavalcanti, 455, 15º andar, Cidade Nova, Rio de Janeiro – RJ<br>
+        E-mail: cgalp.rio@prefeitura.rio
     </footer>
 
 </body>

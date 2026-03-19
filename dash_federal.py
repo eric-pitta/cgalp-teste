@@ -103,50 +103,104 @@ def load_data():
         for col in ['Requerente', 'Orgao', 'Bairro', 'Status']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().str.upper()
-                df[col] = df[col].replace(['NAN', 'NONE', ''], 'NÃO INFORMADO')
+                df[col] = df[col].replace(['NAN', 'NONE', '', '0', '0.0'], 'NÃO INFORMADO')
         return df
     except Exception as e:
         st.error(f"Erro crítico na conexão Google: {e}")
         return pd.DataFrame()
 
-def gerar_grafico_html(df_input, coluna_grupo, cor_classe):
-    if df_input.empty: return "<p>Sem dados.</p>"
-    stats = df_input.groupby(coluna_grupo).agg(Total=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index().sort_values('Total', ascending=False)
-    max_val = stats['Total'].max()
-    html_items = ""
-    for _, row in stats.iterrows():
-        perc_total = (row['Total'] / max_val * 100)
-        perc_resp = (row['Respondidos'] / max_val * 100)
-        html_items += f'<div class="chart-row"><div class="chart-label"><span>{row[coluna_grupo]}</span><span class="stats-info">{int(row["Respondidos"])} respondidos de {int(row["Total"])}</span></div><div class="bar-outer"><div class="bar-inner-total bar-{cor_classe}-light" style="width: {perc_total}%;"></div><div class="bar-inner-respondido bar-{cor_classe}-dark" style="width: {perc_resp}%;"></div></div></div>'
-    return html_items
+def gerar_tabela_html(df_input, coluna_grupo, titulo, icone, cor_classe, is_status=False):
+    if df_input.empty: return ""
+    if 'Total' in df_input.columns and 'Respondidos' in df_input.columns:
+        stats = df_input.copy()
+    else:
+        stats = df_input.groupby(coluna_grupo).agg(Total=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index()
+    
+    stats = stats.sort_values('Total', ascending=False).reset_index(drop=True)
+    max_total = stats['Total'].max() if not stats.empty else 1
+    
+    html = f"<div class='table-header-bar'>{icone} {titulo}</div>"
+    html += "<table><thead><tr><th>Exibição</th><th>Qtd Total</th><th>Respondidos</th><th>%</th></tr></thead><tbody>"
+    
+    for i, row in stats.iterrows():
+        medal = ""
+        cls = ""
+        if not is_status:
+            if i == 0: medal = " 🥇"; cls = "top-1"
+            elif i == 1: medal = " 🥈"; cls = "top-2"
+            elif i == 2: medal = " 🥉"; cls = "top-3"
+        else:
+            s_up = str(row[coluna_grupo]).upper()
+            if s_up in ['SIM', 'CONCLUÍDO', 'ATENDIDO', 'FINALIZADO']: cls = "status-sim"
+            elif s_up in ['NÃO', 'EM ATRASO']: cls = "status-nao"
+            elif s_up in ['EM ANDAMENTO','PENDENTE' ]: cls = "status-andamento"
+            elif s_up in ['PARCIAL', 'AGUARDANDO']: cls = "status-parcial"
+
+        total_val = int(row['Total'])
+        resp_val = int(row['Respondidos'])
+        perc = (resp_val / total_val * 100) if total_val > 0 else 0
+        perc_barra_total = (total_val / max_total * 100)
+        
+        html += f"<tr>"
+        html += f"<td class='{cls}'>{row[coluna_grupo]}{medal}</td>"
+        html += f"<td>{total_val}<div class='progress-container'><div class='progress-bar bar-blue' style='width: {perc_barra_total}%; opacity: 0.6;'></div></div></td>"
+        html += f"<td>{resp_val}<div class='progress-container'><div class='progress-bar bar-{cor_classe}' style='width: {perc}%;'></div></div></td>"
+        html += f"<td>{perc:.1f}%</td>"
+        html += f"</tr>"
+    
+    html += "</tbody></table>"
+    return html
 
 def exportar_html(df_filtrado, estilo_mapa, titulo_rel):
     try:
         with open("relatorio.html", "r", encoding="utf-8") as f: template = f.read()
-        counts = df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
+        counts = df_filtrado[~df_filtrado['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].value_counts().reset_index()
         counts.columns = ['Bairro', 'Quantidade']
         counts['coords'] = counts['Bairro'].apply(obter_coordenadas)
         counts['lat'] = counts['coords'].apply(lambda x: x[0] if x else None)
         counts['lon'] = counts['coords'].apply(lambda x: x[1] if x else None)
         map_final = counts.dropna(subset=['lat', 'lon'])
+        map_final = map_final[map_final['Quantidade'] > 0]
         fig_print = px.scatter_mapbox(map_final, lat="lat", lon="lon", size="Quantidade", color="Quantidade", color_continuous_scale='Plasma', size_max=20, mapbox_style=estilo_mapa)
         fig_print.update_layout(mapbox=dict(center=dict(lat=-22.915, lon=-43.44), zoom=9.2), coloraxis_colorbar=dict(orientation='h', y=-0.1), margin=dict(l=0, r=0, t=0, b=0))
         mapa_html = fig_print.to_html(full_html=False, include_plotlyjs='cdn')
         
-        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo2.png"))
-        html = html.replace('<img src="data:image/png;base64,{{MAPA_BASE64}}" alt="Mapa de Incidências">', mapa_html)
-        html = html.replace("{{TITULO_RELATORIO}}", titulo_rel)
-        html = html.replace("{{TOTAL_SOLIC}}", str(len(df_filtrado))).replace("{{TOTAL_RESP}}", str(int(df_filtrado['Respondido'].sum()))).replace("{{TOTAL_BAIRROS}}", str(df_filtrado['Bairro'].nunique()))
-        html = html.replace("{{DATA_GERACAO}}", pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"))
+        total_sol = len(df_filtrado)
+        total_resp = int(df_filtrado['Respondido'].sum())
+        perc_total = (total_resp / total_sol * 100) if total_sol > 0 else 0
         
-        anos = sorted(st.session_state.sb_ano)
-        periodo = f"Anos: {', '.join(map(str, anos))}" if anos else "Geral"
+        html = template.replace("{{LOGO_BASE64}}", get_base64_logo("logo2.png"))
+        html = html.replace("{{MAPA_HTML}}", mapa_html)
+        html = html.replace("{{TITULO_RELATORIO}}", titulo_rel)
+        html = html.replace("{{LABEL_SOLIC}}", "Solicitações")
+        html = html.replace("{{TOTAL_SOLIC}}", str(total_sol))
+        html = html.replace("{{TOTAL_RESP}}", str(total_resp))
+        html = html.replace("{{PERC_RESP}}", f"{perc_total:.1f}")
+        html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado[~df_filtrado['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].nunique()))
+        
+        # --- RESUMO DE FILTROS APLICADOS ---
+        filtros_list = []
+        anos = sorted(st.session_state.sb_ano) if 'sb_ano' in st.session_state else []
+        if anos: filtros_list.append(f"Anos: {', '.join(map(str, anos))}")
+        if st.session_state.get('sb_req') and st.session_state.sb_req != "TODOS": filtros_list.append(f"Requerente: {st.session_state.sb_req}")
+        if st.session_state.get('sb_org') and st.session_state.sb_org != "TODOS": filtros_list.append(f"Órgão: {st.session_state.sb_org}")
+        if st.session_state.get('sb_bairro') and st.session_state.sb_bairro != "TODOS": filtros_list.append(f"Bairro: {st.session_state.sb_bairro}")
+        if st.session_state.get('sb_status') and st.session_state.sb_status != "TODOS": filtros_list.append(f"Situação: {st.session_state.sb_status}")
+        if st.session_state.get('click_req'): filtros_list.append(f"Filtro Gráfico (Deputado): {st.session_state.click_req}")
+        if st.session_state.get('click_org'): filtros_list.append(f"Filtro Gráfico (Órgão): {st.session_state.click_org}")
+        if st.session_state.get('click_bairro'): filtros_list.append(f"Filtro Gráfico (Bairro): {st.session_state.click_bairro}")
+        
+        periodo = " | ".join(filtros_list) if filtros_list else "Relatório Geral"
         html = html.replace("{{PERIODO}}", periodo)
         
-        html = html.replace("{{CHART_REQUERENTES}}", gerar_grafico_html(df_filtrado, 'Requerente', 'blue')).replace("{{CHART_ORGAOS}}", gerar_grafico_html(df_filtrado, 'Orgao', 'green')).replace("{{CHART_BAIRROS}}", gerar_grafico_html(df_filtrado[df_filtrado['Bairro'] != 'NÃO INFORMADO'], 'Bairro', 'violet'))
-        status_stats = df_filtrado.groupby('Status').size().reset_index(name='Qtd').sort_values('Qtd', ascending=False)
-        status_html = "".join([f'<div class="chart-row"><div class="chart-label"><span>{r["Status"]}</span><span>{r["Qtd"]}</span></div><div class="bar-outer"><div class="bar-inner-respondido bar-orange-dark" style="width: {(r["Qtd"]/status_stats["Qtd"].max()*100)}%;"></div></div></div>' for _, r in status_stats.iterrows()])
-        html = html.replace("{{CHART_STATUS}}", status_html)
+        tab_html = gerar_tabela_html(df_filtrado, 'Requerente', "Desempenho por Requerente", "👤", 'blue')
+        tab_html += gerar_tabela_html(df_filtrado, 'Orgao', "Demandas por Órgão", "🏢", 'green')
+        tab_html += gerar_tabela_html(df_filtrado[~df_filtrado['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])], 'Bairro', "Solicitações por Bairro", "📍", 'violet')
+        
+        status_stats = df_filtrado.groupby('Status').agg(Total=('Respondido', 'count'), Respondidos=('Respondido', 'sum')).reset_index().sort_values('Total', ascending=False)
+        tab_html += gerar_tabela_html(status_stats, 'Status', "Situação dos Atendimentos", "📌", 'orange', is_status=True)
+        
+        html = html.replace("{{TABELAS_HTML}}", tab_html)
         return html
     except Exception as e: return f"Erro: {e}"
 
@@ -164,45 +218,56 @@ def limpar_filtros_federal():
     st.session_state.click_req = None
     st.session_state.click_org = None
     st.session_state.click_bairro = None
-    chaves = ["sb_ano", "sb_req", "sb_bairro", "sb_status"]
+    chaves = ["sb_ano", "sb_req", "sb_org", "sb_bairro", "sb_status"]
     for k in chaves:
         if k in st.session_state: del st.session_state[k]
 
 with st.sidebar:
     st.button("Limpar Filtros (Federal)", on_click=limpar_filtros_federal)
     anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
-    ano_sel = st.multiselect("Filtrar por Ano", anos_dis, default=anos_dis, key="sb_ano")
+    st.multiselect("Filtrar por Ano", anos_dis, default=anos_dis, key="sb_ano")
     st.selectbox("Filtrar por Requerente", ["TODOS"] + sorted(df['Requerente'].unique().tolist()), key="sb_req")
+    st.selectbox("Filtrar por Órgão", ["TODOS"] + sorted([o for o in df['Orgao'].unique().tolist() if o != 'NÃO INFORMADO']), key="sb_org")
     st.selectbox("Filtrar por Bairro", ["TODOS"] + sorted(df['Bairro'].unique().tolist()), key="sb_bairro")
     st.selectbox("Filtrar por Situação", ["TODOS"] + sorted(df['Status'].unique().tolist()), key="sb_status")
     estilo_mapa = st.selectbox("Estilo do Mapa", ["carto-positron", "open-street-map", "carto-darkmatter"], key="sb_mapa")
     st.divider()
-    
-    anos_lista = ", ".join([str(a) for a in sorted(st.session_state.sb_ano)]) if st.session_state.sb_ano else "Nenhum"
-    titulo_dinamico = f"Câmara dos Deputados ({anos_lista})"
-    
+
+# --- APLICAÇÃO DE FILTROS ---
+df_f = df.copy()
+if 'sb_ano' in st.session_state and st.session_state.sb_ano: 
+    df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
+if 'sb_req' in st.session_state and st.session_state.sb_req != "TODOS": 
+    df_f = df_f[df_f['Requerente'] == st.session_state.sb_req]
+if 'sb_org' in st.session_state and st.session_state.sb_org != "TODOS": 
+    df_f = df_f[df_f['Orgao'] == st.session_state.sb_org]
+if 'sb_bairro' in st.session_state and st.session_state.sb_bairro != "TODOS": 
+    df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro]
+if 'sb_status' in st.session_state and st.session_state.sb_status != "TODOS": 
+    df_f = df_f[df_f['Status'] == st.session_state.sb_status]
+
+if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
+if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
+if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
+
+# Título dinâmico
+anos_lista = ", ".join([str(a) for a in sorted(st.session_state.sb_ano)]) if 'sb_ano' in st.session_state and st.session_state.sb_ano else "Geral"
+titulo_dinamico = f"Câmara dos Deputados ({anos_lista})"
+
+# Botão de Relatório
+with st.sidebar:
     if st.button("Preparar Relatório"):
         with st.spinner("Gerando..."):
-            rel_html = exportar_html(df.copy(), estilo_mapa, titulo_dinamico)
+            rel_html = exportar_html(df_f.copy(), estilo_mapa, titulo_dinamico)
             st.download_button(label="📥 Baixar Relatório", data=rel_html, file_name="relatorio_federal.html", mime="text/html")
 
 # --- TÍTULO DINÂMICO UI ---
 st.markdown(f"<h1 class='main-title'>{titulo_dinamico}</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>Coordenadoria Geral de Acompanhamento Legislativo e Parlamentar</p>", unsafe_allow_html=True)
 
-# --- APLICAÇÃO DE FILTROS ---
-df_f = df.copy()
-if st.session_state.sb_ano: df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano)]
-if st.session_state.sb_req != "TODOS": df_f = df_f[df_f['Requerente'] == st.session_state.sb_req]
-if st.session_state.sb_bairro != "TODOS": df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro]
-if st.session_state.sb_status != "TODOS": df_f = df_f[df_f['Status'] == st.session_state.sb_status]
-if st.session_state.click_req: df_f = df_f[df_f['Requerente'] == st.session_state.click_req]
-if st.session_state.click_org: df_f = df_f[df_f['Orgao'] == st.session_state.click_org]
-if st.session_state.click_bairro: df_f = df_f[df_f['Bairro'] == st.session_state.click_bairro]
-
 # --- CONTEÚDO ---
 st.markdown("<div class='section-header'>🗺️ Geocalização de Demandas</div>", unsafe_allow_html=True)
-map_counts = df_f[df_f['Bairro'] != 'NÃO INFORMADO']['Bairro'].value_counts().reset_index()
+map_counts = df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].value_counts().reset_index()
 map_counts.columns = ['Bairro', 'Quantidade']
 with st.spinner("📍 Mapeando bairros..."):
     map_counts['coords'] = map_counts['Bairro'].apply(obter_coordenadas)
@@ -217,6 +282,7 @@ if not map_ready.empty:
         st.session_state.click_bairro = sel_map["selection"]["points"][0]["hovertext"]; st.rerun()
 else: st.info("Nenhum bairro válido para exibir no mapa.")
 
+st.write("")
 m_col = st.columns(6)
 total_solic = len(df_f)
 total_resp = int(df_f['Respondido'].sum())
@@ -235,14 +301,37 @@ for i, (label, val) in enumerate(metrics):
 def criar_tabela_tech(df_input, col, titulo, icone, key, cor):
     if df_input.empty: return
     stats = df_input.groupby(col).agg(Qtd=('Respondido', 'count'), Resp=('Respondido', 'sum')).reset_index()
-    stats['% Respondido'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0); stats = stats.sort_values('Qtd', ascending=False)
+    stats['% Respondido'] = (stats['Resp'] / stats['Qtd'] * 100).fillna(0)
+    stats = stats.sort_values('Qtd', ascending=False).reset_index(drop=True)
+    
+    # Medalhas Dinâmicas
+    def stylize(name, index):
+        medal = ""
+        if index == 0: medal = " 🥇"
+        elif index == 1: medal = " 🥈"
+        elif index == 2: medal = " 🥉"
+        return f"{name}{medal}"
+    
+    stats['Exibição'] = [stylize(row[col], i) for i, row in stats.iterrows()]
+    
     st.markdown(f"<div class='table-header-bar'>{icone} {titulo}</div>", unsafe_allow_html=True)
-    sel = st.dataframe(stats[[col, 'Qtd', '% Respondido']], column_config={col: st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, width="stretch", on_select="rerun")
-    if sel and sel["selection"]["rows"]: st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]; st.rerun()
+    
+    def style_ranking(row):
+        styles = [''] * len(row)
+        if row.name == 0: styles = ['color: #FFD700; font-weight: bold; font-family: Arial'] * len(row)
+        elif row.name == 1: styles = ['color: #C0C0C0; font-weight: bold; font-family: Arial'] * len(row)
+        elif row.name == 2: styles = ['color: #CD7F32; font-weight: bold; font-family: Arial'] * len(row)
+        return styles
+
+    sel = st.dataframe(stats[["Exibição", 'Qtd', '% Respondido']].style.apply(style_ranking, axis=1), column_config={"Exibição": st.column_config.TextColumn(col.capitalize(), width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, width="stretch", on_select="rerun")
+    
+    if sel and sel["selection"]["rows"]: 
+        st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]
+        st.rerun()
 
 criar_tabela_tech(df_f, 'Requerente', "Desempenho por Requerente", "👤", 'click_req', "blue")
 criar_tabela_tech(df_f, 'Orgao', "Desempenho por Órgão", "🏢", 'click_org', "green")
-criar_tabela_tech(df_f[df_f['Bairro'] != 'NÃO INFORMADO'], 'Bairro', "Solicitações por Bairro", "📍", 'click_bairro', "violet")
+criar_tabela_tech(df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])], 'Bairro', "Solicitações por Bairro", "📍", 'click_bairro', "violet")
 
 st.markdown("<div class='section-header'>📌 Situação dos Atendimentos</div>", unsafe_allow_html=True)
 if not df_f.empty:
