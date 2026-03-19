@@ -146,7 +146,7 @@ with st.sidebar:
     # Seletor de Dashboard no TOPO
     pagina = st.selectbox(
         "Selecione o Painel:",
-        ["Câmara Federal - Deputados", "CMRJ - Indicações Legislativas"]
+        ["Câmara Federal - Deputados", "CMRJ - Indicações Legislativas", "CMRJ - Solicitações Legislativas"]
     )
     st.divider()
 
@@ -158,5 +158,10 @@ if pagina == "Câmara Federal - Deputados":
 
 elif pagina == "CMRJ - Indicações Legislativas":
     with open("dash_cmrj.py", "r", encoding="utf-8") as f:
+        code = f.read()
+        exec(code)
+
+elif pagina == "CMRJ - Solicitações Legislativas":
+    with open("dash_solicitacoes_cmrj.py", "r", encoding="utf-8") as f:
         code = f.read()
         exec(code)
