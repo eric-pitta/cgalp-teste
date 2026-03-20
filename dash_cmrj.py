@@ -99,9 +99,20 @@ def load_data():
             df['Data'] = pd.to_datetime(df['Data'], dayfirst=True, errors='coerce')
             df['Ano'] = df['Data'].dt.year.fillna(0).astype(int)
         df['Respondido'] = df['DataSaida'].notna() & (df['DataSaida'] != "")
+        # Limpeza final de strings e Unificação de nomes
         for col in ['Requerente', 'Bairro', 'Status', 'Órgão Demandado', 'Órgão Demandado 2', 'Órgão Demandado 3']:
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().str.upper().replace(['NAN', 'NONE', '', '0', '0.0'], 'NÃO INFORMADO')
+        
+        # Unificação de Bairros Duplicados
+        if 'Bairro' in df.columns:
+            mapeamento_bairros = {
+                'ILHA DE PAQUETÁ': 'PAQUETÁ',
+                'ILHA DE PAQUETA': 'PAQUETÁ',
+                'PAQUETA': 'PAQUETÁ'
+            }
+            df['Bairro'] = df['Bairro'].replace(mapeamento_bairros)
+            
         return df
     except Exception as e:
         st.error(f"Erro na conexão CMRJ: {e}"); return pd.DataFrame()

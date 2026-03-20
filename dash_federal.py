@@ -104,6 +104,16 @@ def load_data():
             if col in df.columns:
                 df[col] = df[col].astype(str).str.strip().str.upper()
                 df[col] = df[col].replace(['NAN', 'NONE', '', '0', '0.0'], 'NÃO INFORMADO')
+        
+        # Unificação de Bairros Duplicados
+        if 'Bairro' in df.columns:
+            mapeamento_bairros = {
+                'ILHA DE PAQUETÁ': 'PAQUETÁ',
+                'ILHA DE PAQUETA': 'PAQUETÁ',
+                'PAQUETA': 'PAQUETÁ'
+            }
+            df['Bairro'] = df['Bairro'].replace(mapeamento_bairros)
+            
         return df
     except Exception as e:
         st.error(f"Erro crítico na conexão Google: {e}")
