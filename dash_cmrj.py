@@ -241,7 +241,7 @@ with st.sidebar:
     st.multiselect("Filtrar por Ano", anos_dis, default=anos_dis, key="sb_ano_cmrj")
     st.divider()
 
-    st.subheader("Busca dos TOP X")
+    st.subheader("Filtro por TOP X")
     top_options = ["TODOS", 5, 10, 15, 20, 30, 50]
     st.selectbox("Top Requerente", top_options, key="sb_top_req")
     st.selectbox("Top Órgão", top_options, key="sb_top_org")
