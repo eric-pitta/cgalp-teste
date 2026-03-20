@@ -197,13 +197,26 @@ def exportar_html_cmrj(df_filtrado, estilo_mapa, titulo_rel):
         html = html.replace("{{PERC_RESP}}", f"{perc_total:.1f}")
         html = html.replace("{{TOTAL_BAIRROS}}", str(df_filtrado[~df_filtrado['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].nunique()))
         
+        # --- RESUMO DE FILTROS APLICADOS ---
         filtros_list = []
         anos = sorted(st.session_state.sb_ano_sol) if 'sb_ano_sol' in st.session_state else []
         if anos: filtros_list.append(f"Anos: {', '.join(map(str, anos))}")
-        if st.session_state.get('sb_req_sol') and st.session_state.sb_req_sol != "TODOS": filtros_list.append(f"Requerente: {st.session_state.sb_req_sol}")
-        if st.session_state.get('sb_org_sol') and st.session_state.sb_org_sol != "TODOS": filtros_list.append(f"Órgão: {st.session_state.sb_org_sol}")
-        if st.session_state.get('sb_bairro_sol') and st.session_state.sb_bairro_sol != "TODOS": filtros_list.append(f"Bairro: {st.session_state.sb_bairro_sol}")
-        if st.session_state.get('sb_status_sol') and st.session_state.sb_status_sol != "TODOS": filtros_list.append(f"Situação: {st.session_state.sb_status_sol}")
+        
+        # Filtros TOP X
+        if st.session_state.get('sb_top_req') and st.session_state.sb_top_req != "TODOS": filtros_list.append(f"Top {st.session_state.sb_top_req} Requerentes")
+        if st.session_state.get('sb_top_org') and st.session_state.sb_top_org != "TODOS": filtros_list.append(f"Top {st.session_state.sb_top_org} Órgãos")
+        if st.session_state.get('sb_top_bairro') and st.session_state.sb_top_bairro != "TODOS": filtros_list.append(f"Top {st.session_state.sb_top_bairro} Bairros")
+        if st.session_state.get('sb_top_status') and st.session_state.sb_top_status != "TODOS": filtros_list.append(f"Top {st.session_state.sb_top_status} Situações")
+
+        # Filtros Multiselect
+        if st.session_state.get('sb_req_sol'): filtros_list.append(f"Requerentes: {', '.join(st.session_state.sb_req_sol)}")
+        if st.session_state.get('sb_org_sol'): filtros_list.append(f"Órgãos: {', '.join(st.session_state.sb_org_sol)}")
+        if st.session_state.get('sb_bairro_sol'): filtros_list.append(f"Bairros: {', '.join(st.session_state.sb_bairro_sol)}")
+        if st.session_state.get('sb_status_sol'): filtros_list.append(f"Situações: {', '.join(st.session_state.sb_status_sol)}")
+        
+        if st.session_state.get('click_req_sol'): filtros_list.append(f"Filtro Gráfico (Vereador): {st.session_state.click_req_sol}")
+        if st.session_state.get('click_org_sol'): filtros_list.append(f"Filtro Gráfico (Órgão): {st.session_state.click_org_sol}")
+        if st.session_state.get('click_bairro_sol'): filtros_list.append(f"Filtro Gráfico (Bairro): {st.session_state.click_bairro_sol}")
         
         periodo = " | ".join(filtros_list) if filtros_list else "Relatório Geral"
         html = html.replace("{{PERIODO}}", periodo)
@@ -227,44 +240,103 @@ if df.empty: st.stop()
 
 # --- SIDEBAR FILTROS ---
 def limpar_filtros_sol():
-    for k in ['click_req_sol', 'click_org_sol', 'click_bairro_sol', 'sb_ano_sol', 'sb_req_sol', 'sb_org_sol', 'sb_bairro_sol', 'sb_status_sol']:
+    for k in ['click_req_sol', 'click_org_sol', 'click_bairro_sol', 'sb_ano_sol', 'sb_req_sol', 'sb_org_sol', 'sb_bairro_sol', 'sb_status_sol', 'sb_top_req', 'sb_top_org', 'sb_top_bairro', 'sb_top_status']:
         if k in st.session_state: del st.session_state[k]
 
 with st.sidebar:
-    st.button("Limpar Filtros (Solicitações)", on_click=limpar_filtros_sol)
+    st.button("Limpar Filtros", on_click=limpar_filtros_sol)
+    st.divider()
+    
     anos_dis = sorted([int(a) for a in df['Ano'].unique() if a > 0])
     st.multiselect("Filtrar por Ano", anos_dis, default=anos_dis, key="sb_ano_sol")
-    st.selectbox("Requerente", ["TODOS"] + sorted(df['Requerente'].unique().tolist()), key="sb_req_sol")
+    st.divider()
+
+    st.subheader("Filtro por TOP X")
+    top_options = ["TODOS", 5, 10, 15, 20, 30, 50]
+    st.selectbox("Top Requerente", top_options, key="sb_top_req")
+    st.selectbox("Top Órgão", top_options, key="sb_top_org")
+    st.selectbox("Top Bairro", top_options, key="sb_top_bairro")
+    st.selectbox("Top Situação", top_options, key="sb_top_status")
+    st.divider()
+
+    st.multiselect("Requerente", sorted(df['Requerente'].unique().tolist()), key="sb_req_sol")
     
     lista_orgaos = sorted(list(set(df['Órgão Demandado'].unique().tolist() + 
                                    (df['Órgão Demandado 2'].unique().tolist() if 'Órgão Demandado 2' in df.columns else []) + 
                                    (df['Órgão Demandado 3'].unique().tolist() if 'Órgão Demandado 3' in df.columns else []))))
     if 'NÃO INFORMADO' in lista_orgaos: lista_orgaos.remove('NÃO INFORMADO')
-    st.selectbox("Órgão Demandado", ["TODOS"] + lista_orgaos, key="sb_org_sol")
+    st.multiselect("Órgão Demandado", lista_orgaos, key="sb_org_sol")
     
-    st.selectbox("Bairro", ["TODOS"] + sorted(df['Bairro'].unique().tolist()), key="sb_bairro_sol")
-    st.selectbox("Situação", ["TODOS"] + sorted(df['Status'].unique().tolist()), key="sb_status_sol")
+    st.multiselect("Bairro", sorted(df['Bairro'].unique().tolist()), key="sb_bairro_sol")
+    st.multiselect("Situação", sorted(df['Status'].unique().tolist()), key="sb_status_sol")
+    st.divider()
+    
     estilo_mapa = st.selectbox("Mapa", ["carto-positron", "open-street-map", "carto-darkmatter"], key="sb_mapa_sol")
     st.divider()
 
 # --- APLICAÇÃO FILTROS ---
 df_f = df.copy()
+
+# 1. Filtro de Ano
 if 'sb_ano_sol' in st.session_state and st.session_state.sb_ano_sol: 
     df_f = df_f[df_f['Ano'].isin(st.session_state.sb_ano_sol)]
-if 'sb_req_sol' in st.session_state and st.session_state.sb_req_sol != "TODOS": 
-    df_f = df_f[df_f['Requerente'] == st.session_state.sb_req_sol]
-if 'sb_org_sol' in st.session_state and st.session_state.sb_org_sol != "TODOS":
-    org_sel = st.session_state.sb_org_sol
-    mask = (df_f['Órgão Demandado'] == org_sel)
-    if 'Órgão Demandado 2' in df_f.columns: mask |= (df_f['Órgão Demandado 2'] == org_sel)
-    if 'Órgão Demandado 3' in df_f.columns: mask |= (df_f['Órgão Demandado 3'] == org_sel)
-    df_f = df_f[mask]
-if 'sb_bairro_sol' in st.session_state and st.session_state.sb_bairro_sol != "TODOS": 
-    df_f = df_f[df_f['Bairro'] == st.session_state.sb_bairro_sol]
-if 'sb_status_sol' in st.session_state and st.session_state.sb_status_sol != "TODOS": 
-    df_f = df_f[df_f['Status'] == st.session_state.sb_status_sol]
 
-# Filtros por clique
+# --- CÁLCULO DE RANKING ABSOLUTO (PÓS-ANO) PARA MEDALHAS ---
+top_3_req_global = df_f['Requerente'].value_counts().nlargest(3).index.tolist()
+top_3_bairro_global = df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].value_counts().nlargest(3).index.tolist()
+org_stats_global = get_organ_stats(df_f)
+top_3_org_global = org_stats_global['Orgao'].head(3).tolist()
+
+# 2. Filtros TOP X
+if st.session_state.get('sb_top_req') and st.session_state.sb_top_req != "TODOS":
+# ... (rest of filtering logic)
+    top_n = st.session_state.sb_top_req
+    top_list = df_f['Requerente'].value_counts().nlargest(top_n).index.tolist()
+    df_f = df_f[df_f['Requerente'].isin(top_list)]
+
+if st.session_state.get('sb_top_org') and st.session_state.sb_top_org != "TODOS":
+    top_n = st.session_state.sb_top_org
+    # Para órgãos, precisamos de uma contagem especial já que existem 3 colunas
+    org_cols = ['Órgão Demandado']
+    if 'Órgão Demandado 2' in df_f.columns: org_cols.append('Órgão Demandado 2')
+    if 'Órgão Demandado 3' in df_f.columns: org_cols.append('Órgão Demandado 3')
+    org_counts = pd.concat([df_f[c] for c in org_cols]).value_counts()
+    if 'NÃO INFORMADO' in org_counts: org_counts = org_counts.drop('NÃO INFORMADO')
+    top_list = org_counts.nlargest(top_n).index.tolist()
+    
+    mask = (df_f['Órgão Demandado'].isin(top_list))
+    if 'Órgão Demandado 2' in df_f.columns: mask |= (df_f['Órgão Demandado 2'].isin(top_list))
+    if 'Órgão Demandado 3' in df_f.columns: mask |= (df_f['Órgão Demandado 3'].isin(top_list))
+    df_f = df_f[mask]
+
+if st.session_state.get('sb_top_bairro') and st.session_state.sb_top_bairro != "TODOS":
+    top_n = st.session_state.sb_top_bairro
+    top_list = df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].value_counts().nlargest(top_n).index.tolist()
+    df_f = df_f[df_f['Bairro'].isin(top_list)]
+
+if st.session_state.get('sb_top_status') and st.session_state.sb_top_status != "TODOS":
+    top_n = st.session_state.sb_top_status
+    top_list = df_f['Status'].value_counts().nlargest(top_n).index.tolist()
+    df_f = df_f[df_f['Status'].isin(top_list)]
+
+# 3. Filtros Multiselect
+if 'sb_req_sol' in st.session_state and st.session_state.sb_req_sol: 
+    df_f = df_f[df_f['Requerente'].isin(st.session_state.sb_req_sol)]
+
+if 'sb_org_sol' in st.session_state and st.session_state.sb_org_sol:
+    org_sels = st.session_state.sb_org_sol
+    mask = (df_f['Órgão Demandado'].isin(org_sels))
+    if 'Órgão Demandado 2' in df_f.columns: mask |= (df_f['Órgão Demandado 2'].isin(org_sels))
+    if 'Órgão Demandado 3' in df_f.columns: mask |= (df_f['Órgão Demandado 3'].isin(org_sels))
+    df_f = df_f[mask]
+
+if 'sb_bairro_sol' in st.session_state and st.session_state.sb_bairro_sol: 
+    df_f = df_f[df_f['Bairro'].isin(st.session_state.sb_bairro_sol)]
+
+if 'sb_status_sol' in st.session_state and st.session_state.sb_status_sol: 
+    df_f = df_f[df_f['Status'].isin(st.session_state.sb_status_sol)]
+
+# 4. Filtros por clique
 if st.session_state.get('click_req_sol'): df_f = df_f[df_f['Requerente'] == st.session_state.click_req_sol]
 if st.session_state.get('click_org_sol'):
     org_c = st.session_state.click_org_sol
@@ -289,7 +361,7 @@ st.markdown(f"<h1 class='main-title'>{titulo_dinamico}</h1>", unsafe_allow_html=
 st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 30px;'>COORDENADORIA GERAL DE ACOMPANHAMENTO LEGISLATIVO E PARLAMENTAR</p>", unsafe_allow_html=True)
 
 # --- CONTEÚDO ---
-st.markdown("<div class='section-header'>🗺️ Geocalização Solicitações</div>", unsafe_allow_html=True)
+st.markdown("<div class='section-header'>🗺️ Geolocalização de demandas</div>", unsafe_allow_html=True)
 map_counts = df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])]['Bairro'].value_counts().reset_index()
 map_counts.columns = ['Bairro', 'Quantidade']
 with st.spinner("Mapeando..."):
@@ -341,7 +413,16 @@ def criar_tabela(df_input, col, titulo, icone, key, cor):
         elif row.name == 2: styles = ['color: #CD7F32; font-weight: bold; font-family: Arial'] * len(row)
         return styles
 
-    sel = st.dataframe(stats[["Exibição", 'Qtd', '% Respondido']].style.apply(style_top_3, axis=1), column_config={"Exibição": st.column_config.TextColumn(col, width="medium"), "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor)}, hide_index=True, width="stretch", on_select="rerun")
+    sel = st.dataframe(
+        stats[[col, "Exibição", 'Qtd', '% Respondido']].style.apply(style_top_3, axis=1), 
+        column_config={
+            col: None, # Esconde a coluna original usada para o estilo
+            "Exibição": st.column_config.TextColumn(col, width="medium"), 
+            "Qtd": st.column_config.ProgressColumn("Qtd", format="%d", min_value=0, max_value=int(stats['Qtd'].max()) if int(stats['Qtd'].max()) > 0 else 100, color=cor), 
+            "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color=cor)
+        }, 
+        hide_index=True, width="stretch", on_select="rerun"
+    )
     if sel and sel["selection"]["rows"]: 
         st.session_state[key] = stats.iloc[sel["selection"]["rows"][0]][col]
         st.rerun()
@@ -365,18 +446,23 @@ def style_org_top_3(row):
     elif row.name == 2: styles = ['color: #CD7F32; font-weight: bold; font-family: Arial'] * len(row)
     return styles
 
-sel_org = st.dataframe(org_stats[["Exibição", "Total", "% Respondido"]].style.apply(style_org_top_3, axis=1), column_config={
-    "Exibição": st.column_config.TextColumn("Órgão", width="medium"), 
-    "Total": st.column_config.ProgressColumn("Total", format="%d", min_value=0, max_value=int(org_stats['Total'].max() if not org_stats.empty else 1), color="green"),
-    "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color="green")
-}, hide_index=True, width="stretch", on_select="rerun")
+sel_org = st.dataframe(
+    org_stats[["Orgao", "Exibição", "Total", "% Respondido"]].style.apply(style_org_top_3, axis=1), 
+    column_config={
+        "Orgao": None,
+        "Exibição": st.column_config.TextColumn("Órgão", width="medium"), 
+        "Total": st.column_config.ProgressColumn("Total", format="%d", min_value=0, max_value=int(org_stats['Total'].max() if not org_stats.empty else 1), color="green"),
+        "% Respondido": st.column_config.ProgressColumn("% Respondido", format="%.0f%%", min_value=0, max_value=100, color="green")
+    }, 
+    hide_index=True, width="stretch", on_select="rerun"
+)
 if sel_org and sel_org["selection"]["rows"]:
     st.session_state.click_org_sol = org_stats.iloc[sel_org["selection"]["rows"][0]]['Orgao']
     st.rerun()
 
 criar_tabela(df_f[~df_f['Bairro'].isin(['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0'])], 'Bairro', "Indicações por Bairro", "📍", 'click_bairro_sol', "violet")
 
-st.markdown("<div class='section-header'>📌 Situação das Solicitações</div>", unsafe_allow_html=True)
+st.markdown("<div class='section-header'>📌 Conclusão das demandas</div>", unsafe_allow_html=True)
 if not df_f.empty:
     status_counts = df_f['Status'].value_counts().reset_index().sort_values('count', ascending=False)
     total_s = status_counts['count'].sum()

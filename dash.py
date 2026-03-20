@@ -53,7 +53,7 @@ st.markdown("""
 
     /* Ajuste da Tabela para encaixar na barra */
     .stDataFrame {
-        border: 1px solid #113359 !important;
+        border: none !important;
         border-radius: 0 0 12px 12px !important;
         overflow: hidden;
         margin-top: -1px !important;
