@@ -165,19 +165,67 @@ BAIRROS_RJ_COORDS = {
     'VILA ISABEL': [-22.9167, -43.2458], 'PENHA': [-22.8333, -43.2833], 'PAVUNA': [-22.8058, -43.3644],
     'VAZ LOBO': [-22.8533, -43.3267], 'ITANHANGA': [-22.9833, -43.3000], 'TOMAS COELHO': [-22.8722, -43.3047],
     'OLARIA': [-22.8422, -43.2567], 'RAMOS': [-22.8458, -43.2458], 'RIO COMPRIDO': [-22.9264, -43.2086],
-    'COELHO NETO': [-22.8275, -43.3442]
+    'COELHO NETO': [-22.8275, -43.3442], 'SANTA TERESA': [-22.9253, -43.1931], 'LAPA': [-22.9133, -43.1821],
+    'LAGOA': [-22.9719, -43.2025], 'GAVEA': [-22.9751, -43.2285], 'HUMAITA': [-22.9571, -43.1994],
+    'URCA': [-22.9555, -43.1647], 'SAO CRISTOVAO': [-22.8975, -43.2253], 'GLORIA': [-22.9218, -43.1767],
+    'CATETE': [-22.9259, -43.1768], 'COSME VELHO': [-22.9419, -43.1994], 'LARANJEIRAS': [-22.9341, -43.1888],
+    'JARDIM BOTANICO': [-22.9667, -43.2251], 'MARACANA': [-22.9122, -43.2301], 'PRACA DA BANDEIRA': [-22.9094, -43.2181],
+    'ESTACIO': [-22.9147, -43.2025], 'SANTO CRISTO': [-22.9003, -43.1969], 'GAMBOA': [-22.8972, -43.1897],
+    'SAUDE': [-22.8967, -43.1844], 'CAJU': [-22.8872, -43.2169], 'BENFICA': [-22.8931, -43.2372],
+    'MANGUEIRA': [-22.9036, -43.2325], 'ROCHA': [-22.9008, -43.2458], 'RIACHUELO': [-22.9001, -43.2567],
+    'SAMPAIO': [-22.9006, -43.2647], 'ENGENHO NOVO': [-22.9003, -43.2731], 'LINS DE VASCONCELOS': [-22.9117, -43.2847],
+    'TODOS OS SANTOS': [-22.8953, -43.2867], 'CACHAMBI': [-22.8858, -43.2758], 'ENGENHO DE DENTRO': [-22.8958, -43.2967],
+    'ABOLICAO': [-22.8853, -43.3031], 'PILARES': [-22.8797, -43.2953], 'PIEDADE': [-22.8917, -43.3053],
+    'QUINTINO BOCAIUVA': [-22.8867, -43.3153], 'CASCADURA': [-22.8817, -43.3253], 'CAVALCANTE': [-22.8717, -43.3253],
+    'ENGENHEIRO LEAL': [-22.8717, -43.3333], 'TURIACO': [-22.8617, -43.3453], 'OSWALDO CRUZ': [-22.8667, -43.3553],
+    'BENTO RIBEIRO': [-22.8617, -43.3653], 'MARECHAL HERMES': [-22.8617, -43.3753], 'DEODORO': [-22.8553, -43.3853],
+    'GUADALUPE': [-22.8367, -43.3753], 'RICARDO DE ALBUQUERQUE': [-22.8367, -43.3953], 'ANCHIETA': [-22.8217, -43.4053],
+    'PARQUE ANCHIETA': [-22.8217, -43.4153], 'COSTA BARROS': [-22.8117, -43.3653], 'BARROS FILHO': [-22.8117, -43.3553],
+    'HONORIO GURGEL': [-22.8317, -43.3553], 'ROCHA MIRANDA': [-22.8517, -43.3453], 'COLEGIO': [-22.8317, -43.3353],
+    'IRAJA': [-22.8317, -43.3253], 'VILA DA PENHA': [-22.8417, -43.3153], 'VICENTE DE CARVALHO': [-22.8517, -43.3153],
+    'VILA KOSMOS': [-22.8517, -43.3053], 'PENHA CIRCULAR': [-22.8317, -43.2953], 'BRAS DE PINA': [-22.8253, -43.2953],
+    'CORDOVIL': [-22.8153, -43.2953], 'PARADA DE LUCAS': [-22.8053, -43.2953], 'VIGARIO GERAL': [-22.7953, -43.2953],
+    'JARDIM AMERICA': [-22.7953, -43.3153], 'HIGIENOPOLIS': [-22.8653, -43.2653], 'MARIA DA GRACA': [-22.8753, -43.2653],
+    'DEL CASTILHO': [-22.8753, -43.2753], 'INHAUMA': [-22.8753, -43.2853], 'ENGENHO DA RAINHA': [-22.8653, -43.2953],
+    'BONSUCESSO': [-22.8617, -43.2553], 'MANGUINHOS': [-22.8817, -43.2453], 'MARE': [-22.8553, -43.2353],
+    'ACARI': [-22.8167, -43.3417], 'CURICICA': [-22.9467, -43.3853], 'ANIL': [-22.9567, -43.3353],
+    'GARDENIA AZUL': [-22.9667, -43.3553], 'CIDADE DE DEUS': [-22.9467, -43.3653], 'TAQUARA': [-22.9267, -43.3753],
+    'TANQUE': [-22.9167, -43.3653], 'PECHINCHA': [-22.9367, -43.3553], 'FREGUESIA JACAREPAGUA': [-22.9417, -43.3417],
+    'PRACA SECA': [-22.8967, -43.3553], 'VILA VALQUEIRE': [-22.8867, -43.3653], 'CAMORIM': [-22.9717, -43.4053],
+    'VARGEM PEQUENA': [-22.9917, -43.4453], 'VARGEM GRANDE': [-22.9917, -43.4853], 'GRUMARI': [-23.0417, -43.5253],
+    'GUARATIBA': [-22.9867, -43.6053], 'BARRA DE GUARATIBA': [-23.0617, -43.5653], 'PEDRA DE GUARATIBA': [-23.0017, -43.6353],
+    'SEPETIBA': [-22.9717, -43.7053], 'PACIENCIA': [-22.9167, -43.6353], 'COSMOS': [-22.9067, -43.6153],
+    'INHOAIBA': [-22.9117, -43.5853], 'SENADOR CAMARA': [-22.8867, -43.5053], 'SENADOR VASCONCELOS': [-22.8967, -43.5253],
+    'SANTISSIMO': [-22.8867, -43.5353], 'PADRE MIGUEL': [-22.8767, -43.4553], 'MAGALHAES BASTOS': [-22.8767, -43.4253],
+    'VILA MILITAR': [-22.8667, -43.4053], 'PAQUETA': [-22.7567, -43.1053], 'ROCINHA': [-22.9883, -43.2483],
+    'VIDIGAL': [-22.9933, -43.2383], 'JACARE': [-22.8917, -43.2553], 'VILA DA PENHA': [-22.8417, -43.3153]
 }
 
 @st.cache_data(show_spinner=False)
 def obter_coordenadas(bairro):
+    if not bairro or bairro in ['NÃO INFORMADO', 'N/A', 'NA', '', '0', '0.0']: return [None, None]
     bairro_norm = normalizar(bairro)
+    
+    # Mapeamentos de nomes comuns para garantir correspondência no dicionário
+    mapeamentos = {
+        'FREGUESIA': 'FREGUESIA JACAREPAGUA',
+        'FREGUESIA DO JACAREPAGUA': 'FREGUESIA JACAREPAGUA',
+        'ILHA DE PAQUETA': 'PAQUETA',
+        'PAQUETA': 'PAQUETA',
+        'RECREIO': 'RECREIO DOS BANDEIRANTES',
+        'BARRA': 'BARRA DA TIJUCA'
+    }
+    if bairro_norm in mapeamentos: bairro_norm = mapeamentos[bairro_norm]
+    
     if bairro_norm in BAIRROS_RJ_COORDS:
         return BAIRROS_RJ_COORDS[bairro_norm]
-    geolocator = Nominatim(user_agent="monitoramento_cgalp_rj")
+    
+    # Fallback para Geocodificação (apenas se não estiver no dicionário)
+    geolocator = Nominatim(user_agent="monitoramento_cgalp_rj_v2")
     query = f"{bairro}, Rio de Janeiro, RJ, Brasil"
     try:
-        time.sleep(1)
-        location = geolocator.geocode(query)
+        time.sleep(0.5) # Reduzido para melhorar performance
+        location = geolocator.geocode(query, timeout=5)
         if location:
             return [location.latitude, location.longitude]
     except Exception:
